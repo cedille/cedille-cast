@@ -1,0 +1,127 @@
+module cedille-cast-01.
+
+{-
+  ◂     \f
+  ★     \s
+  ∀     \a
+  Π     \P
+  ➔     \r
+  ·     \.
+  ●     \h
+-}
+
+{-
+  Hello and welcome to the Cedille Cast, a series of videos on programming and
+  programming in Cedille, a new dependently typed language with some rather
+  exotic features.
+
+  The intended audience is people who are already familiar with Coq and Agda and
+  are interested in seeing developments in a very different style of type
+  theory.
+
+  First video is on exploring one of the ways Cedille is very different from
+  these other languages -- it is not based on the Calculus of Inductive
+  Constructions (CIC), but instead a type theory in which induction can be
+  /derived/, not given as primitive.
+
+  To see how, it's helpful to have some idea of why deriving induction fails in
+  plain Calculus of Constructions (CC). This failed attempt will be part 1, and
+  we'll use it to learn how to do some basic programming in Cedille along the
+  way. In part 2, we'll introduce the new typing constructs that let us
+  successfully derive induction.
+
+  First, let us define the standard impredicative Church-encoding of natural
+  numbers.
+-}
+
+
+Nat ◂ ★ = ∀ X: ★. X ➔ (X ➔ X) ➔ X.
+zero ◂ Nat = Λ X. λ base. λ step. base.
+succ ◂ Nat ➔ Nat
+  = λ n. Λ X. λ base. λ step. step (n base step).
+
+{-
+  We can now define some numbers
+-}
+
+one   = succ zero.
+two   = succ one.
+three = succ two.
+
+{-
+  and some basic programs!
+-}
+
+add ◂ Nat ➔ Nat ➔ Nat
+  = λ n. λ m. n m (λ x. succ x).
+
+{-
+  Great, now let's try to prove induction. Let's start with something simpler
+  though -- proving that *a* number satisfies induction, in the hopes that this
+  gives us a clue how to proceed
+-}
+
+iNat ◂ Nat ➔ ★
+  = λ n: Nat. ∀ P: Nat ➔ ★. P zero ➔ (Π m: Nat. P m ➔ P (succ m)) ➔ P n.
+
+izero ◂ iNat zero
+  = Λ P. λ base. λ step. base.
+
+ione ◂ iNat one
+  = Λ P. λ base. λ step. step zero base.
+
+ithree ◂ iNat three
+  = Λ P. λ base. λ step. step two (step one (step zero base)).
+
+{-
+  Hey, the proofs look just like iterating the step case n times!
+-}
+
+ind-Nat-fail1
+  ◂ ∀ P: Nat ➔ ★. P zero ➔ (Π m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+  = Λ P. λ base. λ step. λ n. n base step.
+
+{- No dice, n computes non-indexed X but we need indexed P.
+   What if we packaged together in a dependent pair a number x and a proof P x?
+-}
+
+import sigma.
+
+izero-sig ◂ iNat zero
+  = Λ P. λ base. λ step.
+      [ pf ◂ (Sigma ·Nat ·(λ x: Nat. P x))
+        = zero (mksigma zero base)
+               (λ pf'. [ n' = proj1 pf']
+                 - mksigma (succ n') (step n' (proj2 pf')))
+      ]
+      - [ zero' = proj1 pf ]
+      - proj2 pf.
+
+{- Works in the concrete case, what about for all n? -}
+
+ind-fail2
+  ◂ ∀ P: Nat ➔ ★. P zero ➔ (Π m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+  = Λ P. λ base. λ step. λ n.
+      [ pf ◂ (Sigma ·Nat ·(λ x: Nat. P x))
+        = n (mksigma zero base)
+               (λ pf'. [ n' = proj1 pf']
+                 - mksigma (succ n') (step n' (proj2 pf')))
+      ]
+      - [ n' = proj1 pf ]
+      - proj2 pf.
+
+{- Rats! Essentially, Cedille can't see that the first projection is really n,
+   even though we produced it by iterating successor n times on zero -- which
+   should give us back n!
+
+   We need a reflection law... but sadly the only way we know how to prove this
+   at this point is with induction! What a Catch-22!
+-}
+
+ref-Nat-fail1
+  ◂ Π n: Nat. {n ≃ n zero succ}
+  = ind-fail2 ·(λ x: Nat. {x ≃ x zero succ}) β (λ m. λ eq. ρ+ ς eq - β).
+
+{-
+  We'll see how to fix this in the next screencast.
+-}

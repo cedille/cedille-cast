@@ -1,0 +1,21 @@
+-- list of directories (separated by spaces) to import files, besides the local dir
+import-directories
+  = "./lib".
+
+-- cache Cedille JSON spans in a .cede file
+use-cede-files
+  = false.
+
+-- compile Cedille to Racket
+make-rkt-files
+  = false.
+
+generate-logs
+  = false.
+
+-- Debugging options
+show-qualified-vars
+  = false.
+
+erase-types
+  = false.
