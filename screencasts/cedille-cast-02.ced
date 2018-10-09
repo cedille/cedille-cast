@@ -1,0 +1,199 @@
+module cedille-cast-02.
+
+{-
+    ◂     \f
+    ★     \s
+    ∀     \a
+    ➔     \r
+    Λ     \L
+    Π     \p
+    ●     \h
+    ·     \.
+    ι     \i.
+-}
+
+{-
+  Hello and welcome back to the Cedille cast, a series of videos showing how to
+  write programs and proofs in Cedille. This episode is the second and final
+  part of a sequence showing how it is possible to /derive/ induction for
+  impredicative λ-encodings in Cedille.
+
+  The first video showed a failed attempt at trying to do so using just the
+  impredicative Calc. of Cons. + dependent pair types. The point of this was to
+  show were we get stuck, in order to motivate the new typing constructs Cedille
+  adds to complete the derivation. Along the way, we noticed our first crucial
+  observation -- that the proofs that *particular* number encodings satisfied
+  induction looked a lot like the encodings themselves! To show this, lets
+  remove the developments using the dependent pair and restore the cleaner
+  versions of the proofs below. {Remove sigma}
+
+  The first insight into completing the proof of induction is making use of this
+  strange coincidence -- could we somehow take advantage of the fact that
+  numbers are "intrinsically" inductive? Can we view them as being *both* their
+  own iterators *and* their own proofs of induction? Yes, we can -- by
+  introducing the dependent intersection!
+
+  Well, before talking about depenent intersection, let's just talk about a
+  regular intersection type -- namely the idea that a single term can have two
+  types. Let's start with a simple example -- the fact that zero can be both a
+  Nat and a Bool! {Write Bool}
+-}
+
+Bool ◂ ★ = ∀ X: ★. X ➔ X ➔ X.
+true ◂ Bool = Λ X. λ then. λ else. then.
+flse ◂ Bool = Λ X. λ then. λ else. else.
+
+{-
+  If we look closely it becomes apparent that the untyped lambda term `true` is
+  the same as the one for zero. In Cedille, we can witness this with
+  intersection! (Bool, zeroιtrue). We introduce an intersection with...
+
+  Note that here it's non-dependent because I haven't given the first component
+  a name. Adding dependency means that the second type (the rhs of the
+  intersection) can /depend upon/ the term given for the lhs of the intersection
+  -- but the twisty thing about this is that the terms for the lhs and rhs are
+  ultimately the /same/ term! You can think of the dependent intersection as
+  telling a kind of story: first, I can give some untyped term a "first draft"
+  version of a type, then I can revise to a "second draft" version of the type
+  -- but my second draft can mention the first draft. The final requirement is
+  that both components /erase/ to the same thing.
+
+  So let's take a look at how to do this in the dependent case. First, we need
+  to rename our type Nat -- in a sense it's not *really* a nat, but just the
+  "coarse" computational version of it. The real Nat is yet to come!
+-}
+
+cNat ◂ ★ = ∀ X: ★. X ➔ (X ➔ X) ➔ X.
+czero ◂ cNat = Λ X. λ base. λ step. base.
+csucc ◂ cNat ➔ cNat = λ n. Λ X. λ base. λ step. step (n base step) .
+
+-- one = csucc zero.
+-- two = csucc one.
+-- three  = succ two.
+
+zeroιtrue ◂ ι _: cNat. Bool -- {add ι}
+  = [ czero , true ].
+
+iNat ◂ cNat ➔ ★
+  = λ n: cNat. ∀ P: cNat ➔ ★. P czero ➔ ({- Π -} ∀ m: cNat. P m ➔ P (csucc m)) ➔ P n.
+
+-- ind-Nat ◂ ∀ P: Nat ➔ ★. P zero ➔ (Π m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+--   = Λ P. λ base. λ step. λ n. ●.
+
+izero ◂ iNat czero
+  = Λ P. λ base. λ step. base.
+
+isucc ◂ {-Π-} ∀ m: cNat. iNat m ➔ iNat (csucc m)
+  = Λ m. λ im. Λ P. λ base. λ step. step -m (im base step).
+
+
+-- ione ◂ iNat one
+--   = Λ P. λ base. λ step. step zero base.
+
+-- ithree ◂ iNat three
+--   = Λ P. λ base. λ step. step two (step one (step zero base)).
+
+{- Indeed, the reall Nat is the intersection of all cNats that are also proofs
+   of their own induction!
+-}
+
+Nat ◂ ★ = ι x: cNat. iNat x.
+zero ◂ Nat = [ czero , izero ].
+succ ◂ Nat ➔ Nat = λ n. [ csucc n.1 , isucc -n.1 n.2 ] .
+
+{-
+  Now, by the way, that .1 and .2 notation is for projecting from an
+  intersection. The idea is that .1 lets you "view" the lhs of the intersection,
+  and .2 lets you view the rhs.
+
+  Well, we have a bit of a problem in the successor case. You can see plainly
+  that the proof that the successor of an inductive nat is also inductive
+  doesn't look precisely like the coarse version of successor. There's this
+  extra argument n in the middle used for typing the "true" base case, that P
+  holds for n. This is unfortunate, because we really only need that first "n"
+  argument for typing.
+
+  This is addressed with the next construct Cedille adds -- implicit producs, ∀.
+  Earlier we said that you can think of this as being the quantifier for types,
+  but this is not the whole story -- now we can reveal that it's the quantifier
+  for *all* erased entities, which includes terms as well! An erased term is
+  used only for typing, but does not appear in the erasure of the term (you can
+  think of this as the "run time" of the term.)
+
+  vv --- vv
+  Now we can make some progress proving induction! But we're not quite there
+  yet. We have a kind of induction for cNats -- that is we can reason by
+  induction over cNats using Nats -- but we don't have induction for Nats! Let's
+  see where this goes wrong before we add the final typing construct.
+-}
+
+-- indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+--   = Λ P. λ base. λ step. λ n. n.2 ·{-●-}(λ n: Nat. P n) base step.
+
+{- Rats, we're so close! But our "induction" proof only holds for cNats, not
+   Nats. So we need to express our motive concerning P as a property concerning
+   cNats. And to do *that*, we need a way to convert cNats to Nats.
+-}
+
+
+cNat2Nat ◂ cNat ➔ Nat
+  = λ n. n zero succ.
+
+{-
+   But similar to the last video, we need some way to relate the Nat we got from
+   our cNat to the original Nat! See here
+-}
+
+-- indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+--   = Λ P. λ base. λ step. λ n. n.2 ·(λ n: cNat. P (cNat2Nat n)) base step.
+
+{-
+   We're told that n is not necessarily equal to cNat2Nat n -- well, you'll have
+   to forgive Cedille here for eagerly applying erasure on terms, because what
+   it's really saying is that it can't see that {n ≃ cNat2Nat n.1}. Happily
+   enough we can prove this as it stands in Cedille, with just cNat induction,
+   using a built in equality type!
+-}
+
+refNat ◂ Π n: Nat. { n ≃ cNat2Nat n.1 }
+  = λ n. n.2 ·(λ x: cNat. {x ≃ cNat2Nat x}) β (Λ m. λ eq. ρ+ ς eq - β).
+
+{-
+   Now, besides impredicativity, this might just be one of the most
+   controversial things Cedille does. Because if you look closely, the variable
+   x is used as if it had two different types -- x is used both where it's
+   expected to have type Nat and type cNat. You can do this in Cedille because
+   its equality be *UNTYPED*. In Cedille, equality means merely βη equality
+   of untyped λ-expressions.
+
+   Again, this may seem totally bizare, especially comming from Agda, Idris, or
+   Coq -- but in an extrinsic theory in Cedille, we consider the ultimate
+   meaning of an expression to be its erased, pure λ-term, not the type
+   annotations ascribed to it. So the things we really care about equating are
+   pure λ-terms!
+
+   The last piece missing from this puzzle in seeing how this definition could
+   possibly make sense, is understanding the erasure for projections of
+   dependent intersections. Since both the lhs and rhs of an intersection have
+   the same untyped underlying term, first and second projections get erased --
+   because all they are are "views" into the same term. To make what I'm saying
+   more concrete:
+-}
+
+proj1Erase ◂ Π m: Nat. { m ≃ m.1} = λ m. β.
+proj2Erase ◂ Π m: Nat. { m ≃ m.2} = λ m. β.
+
+{-
+   This allows us to say, at the end of the day, that we get the same untyped
+   λ-term n from running cNat2Nat on n.1 -- and that even though the result we
+   get might have a different type than n, since it's the same untyped term, in
+   a sense we already know we can ascribe to it both types cNat and Nat.
+
+   With reflection proven, we can now, finally, derive induction.
+-}
+
+indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+  = Λ P. λ base. λ step. λ n.
+     [ pf = n.2 ·(λ n: cNat. P (cNat2Nat n)) base (Λ m. λ pf'. step -(cNat2Nat m) pf')]
+     - ρ (refNat n) - pf.
+
