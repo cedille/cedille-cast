@@ -15,14 +15,14 @@ module cedille-cast-01.
   programming in Cedille, a new dependently typed language with some rather
   exotic features.
 
-  The intended audience is people who are already familiar with Coq and Agda and
-  are interested in seeing developments in a very different style of type
-  theory.
+  The intended audience is people who are already familiar with languages like
+  Agda, Coq, and Idris, are interested in seeing developments in a very
+  different style of type theory.
 
   First video is on exploring one of the ways Cedille is very different from
   these other languages -- it is not based on the Calculus of Inductive
-  Constructions (CIC), but instead a type theory in which induction can be
-  /derived/, not given as primitive.
+  Constructions (CIC), but instead a type theory in which induction for
+  encodings of datatypes can be  /derived/, not given as primitive.
 
   To see how, it's helpful to have some idea of why deriving induction fails in
   plain Calculus of Constructions (CC). This failed attempt will be part 1, and
@@ -41,6 +41,11 @@ succ ◂ Nat ➔ Nat
   = λ n. Λ X. λ base. λ step. step (n base step).
 
 {-
+  Side note: there are many different styles of λ-encodings. We are using Church
+  encodings because they are the most widely known, but in real Cedille
+  developments we usually "Mendler" style encodings, which have a constant-time
+  predecessor and grow linearly in size with the number they encode.
+
   We can now define some numbers
 -}
 
@@ -53,7 +58,7 @@ three = succ two.
 -}
 
 add ◂ Nat ➔ Nat ➔ Nat
-  = λ n. λ m. n m (λ x. succ x).
+  = λ n. λ m. n m succ.
 
 {-
   Great, now let's try to prove induction. Let's start with something simpler
@@ -75,6 +80,9 @@ ithree ◂ iNat three
 
 {-
   Hey, the proofs look just like iterating the step case n times!
+  step zero base vs step base
+
+  Can we use that observation (due to Leivant) somehow in our proof?
 -}
 
 ind-Nat-fail1
@@ -102,7 +110,7 @@ izero-sig ◂ iNat zero
 ind-fail2
   ◂ ∀ P: Nat ➔ ★. P zero ➔ (Π m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
   = Λ P. λ base. λ step. λ n.
-      [ pf ◂ (Sigma ·Nat ·(λ x: Nat. P x))
+      [ pf ◂ (Sigma ·Nat ·P)
         = n (mksigma zero base)
                (λ pf'. [ n' = proj1 pf']
                  - mksigma (succ n') (step n' (proj2 pf')))
@@ -110,7 +118,7 @@ ind-fail2
       - [ n' = proj1 pf ]
       - proj2 pf.
 
-{- Rats! Essentially, Cedille can't see that the first projection is really n,
+{- Rats! Essentially, Cedille can't see that `proj1 pf` is really n,
    even though we produced it by iterating successor n times on zero -- which
    should give us back n!
 
