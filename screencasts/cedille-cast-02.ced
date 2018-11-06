@@ -174,7 +174,7 @@ refNat ◂ Π n: Nat. { n ≃ cNat2Nat n.1 }
    controversial things Cedille does. Because if you look closely, the variable
    x is used as if it had two different types -- x is used both where it's
    expected to have type Nat and type cNat. You can do this in Cedille because
-   its equality be *UNTYPED*. In Cedille, equality means merely βη equality
+   its equality is *UNTYPED*. In Cedille, equality means merely βη equality
    of untyped λ-expressions.
 
    Again, this may seem strange, but in an extrinsic theory in Cedille, we
