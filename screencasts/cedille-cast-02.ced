@@ -206,3 +206,10 @@ indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ �
   = Λ P. λ base. λ step. λ n.
      [ pf = n.2 ·(λ n: cNat. P (cNat2Nat n)) base (Λ m. λ pf'. step -(cNat2Nat m) pf')]
      - ρ (refNat n) - pf.
+
+
+-- ADDENDUM: Computation Law
+-- Induction is just iteration!
+compLaw ◂ ∀ P: Nat ➔ ★. Π base: P zero. Π step: (∀ m: Nat. P m ➔ P (succ m)). Π n: Nat.
+    {indNat base step n ≃ n base step}
+  = Λ P. λ base. λ step. λ n. β.
