@@ -1,0 +1,37 @@
+module nat.
+
+cNat ◂ ★ = ∀ X: ★. X ➔ (X ➔ X) ➔ X.
+czero ◂ cNat
+  = Λ X. λ base. λ step. base.
+csucc ◂ cNat ➔ cNat
+  = λ n. Λ X. λ base. λ step. step (n base step).
+
+iNat ◂ cNat ➔ ★
+  = λ n: cNat. ∀ P: cNat ➔ ★. P czero ➔ (∀ m: cNat. P m ➔ P (csucc m)) ➔ P n.
+
+izero ◂ iNat czero
+  = Λ P. λ base. λ step. base.
+
+isucc ◂ ∀ m: cNat. iNat m ➔ iNat (csucc m)
+  = Λ m. λ im. Λ P. λ base. λ step. step -m (im base step).
+
+Nat ◂ ★ = ι x: cNat. iNat x.
+
+zero ◂ Nat = [ czero , izero ].
+succ ◂ Nat ➔ Nat
+  = λ n. [ csucc n.1 , isucc -n.1 n.2 ].
+
+cNat2Nat ◂ cNat ➔ Nat
+  = λ n. n zero succ.
+
+refNat ◂ Π n: Nat. { n ≃ cNat2Nat n.1 }
+  = λ n. n.2 ·(λ x: cNat. {x ≃ cNat2Nat x})
+      β (Λ m. λ eq. ρ+ ς eq - β).
+
+indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ Π n: Nat. P n
+  = Λ P. λ base. λ step. λ n.
+      [ pf = n.2 ·(λ x: cNat. P (cNat2Nat x))
+               base (Λ m. λ pf'. step -(cNat2Nat m) pf')]
+      - ρ (refNat n) - pf .
+
+
