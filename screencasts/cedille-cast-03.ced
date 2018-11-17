@@ -1,0 +1,274 @@
+module cedille-cast-03.
+
+{- Equality and Zero-cost Coercions -}
+
+-- Hello again and welcome to the Cedille Cast, a series of videos on writing
+-- programs and proofs in Cedille. In the previous two videos we how to derive
+-- induction for λ-encodings of data-types in a pure type theory, rather than
+-- adding them to the theory as primitive. We saw that this was achived by
+-- adding three new typing constructs to the calculus of constructions:
+-- dependent intersection types, implicit products, and untyped equality.
+--
+-- Now, you may at this point be wondering about the implications of adding
+-- these constructs to the language. Is their only purpose for yielding
+-- inductive datatypes in a small core theory, or are there perhaps some other
+-- interesting things that can be accomplished with them? In this video, we will
+-- answer this question in the positive by showing how to define terms
+-- representing zero-cost coercions between types and proofs that a term has two
+-- different types. Doing so lays the groundwork for future videos covering how
+-- to achieve generic zero-cost proof and program reuse in Cedille, and also
+-- explores some of the seemingly strange consequences of Cedille's type theory
+-- being Curry-style.
+
+{- Equality: Reflexivity -}
+-- Let us start by looking at equality in Cedille again. As mentioned
+-- previously, in Cedille the built-in equality type is over pure, untyped
+-- λ-terms. The introduction form "β", indicates two terms are βη equal.
+
+test-refl-id ◂ {λ x. x ≃ λ x. x} = β.
+test-refl-β  ◂ {λ x. x ≃ (λ x. x) (λ x. x) } = β.
+test-refl-η  ◂ {λ x. x ≃ λ x. λ y. x y} = β.
+
+-- Now, I've just said that Cedille is a pure type theory, but this β axiom is
+-- not a λ term. So what gives? Well, you can consider β to be a special kind of
+-- type annotation for proving equality that gets erased to a λ-term. In the
+-- examples above, β erases to λ x. x. For those of you familiar with Leibniz
+-- equality in the Calculus of Constructions, that should seem fairly intutive.
+-- However, as we'll see shortly λ x. x is not the *only* possible erasure for
+-- β.
+
+-- Another thing: it should be immediately obvious that because equality is over
+-- untyped terms that type-checking is undecidable:
+
+-- test-refl-ω  ◂ {λ x. x ≃ (λ x. x x) (λ x. x x)} = β.
+
+-- Many people might have philosophical objections to this. As a practical
+-- matter, many languages with dependent types already allow you to state types
+-- for which conversion checking can take exceedingly long -- longer perhaps
+-- even than the eventual heat-death of the universe -- even in theoretically
+-- they are guaranteed to terminate. And just like in those languages, in
+-- practice I've found you virtually never accidentally write such a term.
+
+{- Equality: Rewrite -}
+-- Anyway, if β is our introduction form for equality, what is our elimination
+-- form? That is ρ (mnemonic for "rewrite"). ρ takes an equality and rewrites
+-- the expected type left-to-write. For example, here's a proof of the
+-- transitivity of equality:
+
+test-trans ◂ ∀ A: ★. ∀ B: ★. ∀ C: ★. ∀ a: A. ∀ b: B. ∀ c: C.
+    {a ≃ b} ➔ {b ≃ c} ➔ {a ≃ c}
+  = Λ A. Λ B. Λ C. Λ a. Λ b. Λ c. λ eq1. λ eq2. ρ eq1 - eq2.
+
+-- As you can see in the inspect buffer, the expected type {a ≃ c} is rewritten
+-- to {b ≃ c} which `eq2` already proves. Again, the axiom ρ also erases into a
+-- pure λ-term: here, it is eq2 (in general it erases to whatever follows the
+-- dash).
+
+{- Equality: Symmetry -}
+-- Cedille also provides a useful but non-essential operator ς for "symmetry" of
+-- equality.
+
+test-sym1 ◂ ∀ A: ★. ∀ B: ★. ∀ a: A. ∀ b: B. {a ≃ b} ➔ {b ≃ a}
+  = Λ A. Λ B. Λ a. Λ b. λ eq. ς eq.
+
+-- It is inessential because any time you want to show a symmettric equality,
+-- you can just use ρ
+
+test-sym2 ◂ ∀ A: ★. ∀ B: ★. ∀ a: A. ∀ b: B. {a ≃ b} ➔ {b ≃ a}
+  = Λ A. Λ B. Λ a. Λ b. λ eq. ρ eq - β.
+
+-- But for various reasons being able to reason symmetrically directly with ς is
+-- convenient, so it's provided as a primitive.
+
+{- Equality: Absurdity -}
+-- One final note to make of equality before turning to zero-cost coercions is
+-- using so-called absurd equalities. A feature that CC lacks that CIC has is
+-- the ability to prove that true is not equal to false. In Cedille, this
+-- reasoning mechanism is given by another primitive δ which says you can prove
+-- anything from an absurd equation:
+
+Bool ◂ ★ = ∀ X: ★. X ➔ X ➔ X.
+true ◂ Bool = Λ X. λ then. λ else. then.
+flse ◂ Bool = Λ X. λ then. λ else. else.
+
+False ◂ ★ = ∀ X: ★. X.
+
+test-absurd ◂ {true ≃ flse} ➔ False
+  = λ eq. δ False - eq.
+
+-- Normally, this can be proven with the addition of large elimination in the
+-- type theory. Unfortunately, we do not currently have a semantics in Cedille
+-- for large eliminations, so δ is provided for this particular use-case.
+
+{- Casts: Introduction-}
+-- We now have everything we need to express the type of zero-cost coercions. We
+-- shall call these "Casts" and they are defined as follows:
+
+Cast ◂ ★ ➔ ★ ➔ ★ = λ A: ★. λ B: ★. ι f: A ➔ B. {f ≃ λ x. x}.
+
+-- That is, a Cast is a function from A to B that is βη to identity. Now, we can
+-- try to write a constructor for Cast in the expected way:
+
+intrCast-fail ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A ·B
+  = Λ A. Λ B. λ f. λ eq. [ f , ρ ς eq - β ].
+
+-- ... but Cedille complains to us that the two components of the intersection
+-- are not equal! This seems maddening, since after all we *have* evidence that
+-- f really is λ x. x, but we don't as of yet have a way to make use of that
+-- fact!
+
+-- There is yet one more crucial equality primitive we have to use - φ, which
+-- corresponds to Nuprl's "direct computation" principle. That is, if two terms
+-- a and b have been proven to be equal, we can use this fact to introduce a
+-- term that has the same type as `a` but erases to `b`. Let's see that in
+-- action:
+
+intrCast ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A ·B
+  = Λ A. Λ B. λ f. λ eq. [ f , φ ς eq - (ρ eq - β) {f} ].
+
+-- Here, φ takes an equality stating that λ x. x ≃ f and two additional terms.
+-- The first term must erase to λ x. x and have the type we are trying to show
+-- -- here, in this second component of the dependent intersection, we need to
+-- show that f ≃ λ x. x. We can do so with the expression ρ eq - β which as
+-- discussed before erases to λ x. x. The second term we give is f, and this is
+-- what the entire φ expression erases to.
+
+-- φ brings a lot of power, perhaps more than what you would expect. In
+-- particular, you may be concerned by the definition of `intrCast` that the
+-- only kinds of casts you can make use of are those of functions *already*
+-- equal to the identity function. If you have such an `f` lying around, why do
+-- you even need the Cast machinery? The answer is that with φ, we can introduce
+-- casts with *extensional* identities. `f` might not literally be the identity
+-- λ x. x, but if at a certain type it behaves *extensionally* like an identity,
+-- then we can use this to create a cast function that *is intentionally* the
+-- identity λ x. x.
+
+intrCastExt ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. (Π a: A. {f a ≃ a}) ➔ Cast ·A ·B
+  = Λ A. Λ B. λ f. λ ext. [ λ x. φ (ext x) - (f x) {x} , β ].
+
+-- Here, we use φ in the first component for our A ➔ B function, not the second
+-- for our proof. We use the fact that f x ≃ x given to us by `ext x` as our
+-- equality; the first term we give is `f x` which has the desired type `B` and
+-- the desired erasure `f x` (as demanded by the equality); the second term we
+-- give is the term we want to erase to that is equal to `x` (also demanded by
+-- the equality; here that is satisfied trivially by giving `x`).
+
+{- Cast: Introduction (Example) -}
+-- So, now we have a way to introduce casts. To give a concrete example, lets
+-- define a cast between Church-encoded, length-indexed lists and regular lists.
+-- The same can be done for inductive versions of these types, but for the sake
+-- of time I won't walk through the derivations of induction for these types:
+
+import nat.
+
+List ◂ ★ ➔ ★
+  = λ A: ★. ∀ X: ★. X ➔ (A ➔ X ➔ X) ➔ X.
+Vec ◂ ★ ➔ Nat ➔ ★
+  = λ A: ★. λ n: Nat.
+    ∀ X: Nat ➔ ★. X zero ➔ (∀ n: Nat. A ➔ X n ➔ X (succ n)) ➔ X n.
+
+-- And we can go ahead and define constructors for List while we're at it.
+
+nil ◂ ∀ A: ★. List ·A = Λ A. Λ X. λ n. λ c. n.
+cons ◂ ∀ A: ★. A ➔ List ·A ➔ List ·A
+  = Λ A. λ a. λ xs. Λ X. λ n. λ c. c a (xs n c).
+
+castVecList ◂ ∀ A: ★. ∀ n: Nat. Cast ·(Vec ·A n) ·(List ·A)
+  = Λ A. Λ n.
+    [ f ◂ Vec ·A n ➔ List ·A
+        = λ xs. Λ X. λ nil. λ cons. xs ·(λ _: Nat. X) nil (Λ n. cons) ]
+    - intrCast f β.
+
+-- Here, we only need the intentional cast introduction form. We define our cast
+-- function f from `Vec ·A n` to `List ·A` by introducing our vec xs, then
+-- introducing a List: abstract over motive X, the functions `nil` and `cons` to
+-- handle the nil and cons case of the list, and eliminate xs using our `nil`
+-- and `xs`. If you look closely, you'll note that after erasure all we have
+-- done is η-expanded around xs, with the capital `Λ n. cons` getting erased to
+-- just cons. Note that it was very important that in the definition of Vec that
+-- we quantified implicitly of Nat in the vcons case!
+
+{- Cast: Elimination -}
+-- With our introduction forms given, we now ask how to use a cast. A first
+-- attempt at this is shown in our next definition elimCast-fail:
+
+elimCast-fail ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➔ B
+  = Λ A. Λ B. λ a. λ c. c.1 a.
+
+-- Why did I call this `fail`? It type-checks, after all. Well, yes... but it
+-- does not have the desired run-time behavior! At least, not obviously. Take a
+-- look at the erasure. From the definition, it still looks like applying a
+-- function to the term we want to cast. It looks no different from `rapp`
+-- below:
+
+rapp ◂ ∀ A: ★. ∀ B: ★. A ➔ (A ➔ B) ➔ B
+  = Λ A. Λ B. λ a. λ f. f a.
+
+-- Even though we know morally that the difference between eliminating a cast
+-- and `rapp` is that the former is zero-cost -- that is, it's only applying an
+-- identity function -- this is not apparent from the defintion. We want an
+-- elimination principle that is *obviously* zero-cost. And we can get it!
+
+elimCast' ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➔ B
+  = Λ A. Λ B. λ a. λ c. φ (ρ c.2 - β) - (c.1 a) {a}.
+
+-- Again, we use φ, this time the equality we give is the proof that `c.1 a ≃ a`
+-- which we have by rewriting using the proof that `c.1 ≃ λ x. x`, then we give
+-- the term having the type we want (c.1 a), and finally the term we want the
+-- entire expression to erase to `a`
+--
+-- Now, we're almost there. Note however that our cast `c` doesn't actually show
+-- up in the erasure of the definition of elimCast'. This motivates our final
+-- version of the elimination principle: one in which elimCast is definitionally
+-- the identity function:
+
+elimCast ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➾ B
+  = Λ A. Λ B. λ a. Λ c. φ (ρ c.2 - β) - (c.1 a) {a}.
+
+-- To top it all off, lets put our casts to use and define a function over
+-- regular lists that we can reuse as a function over length-indexed lists
+
+length ◂ ∀ A: ★. List ·A ➔ Nat
+  = Λ A. λ xs. xs zero (λ _. succ).
+
+vlength ◂ ∀ A: ★. ∀ n: Nat. Vec ·A n ➔ Nat
+  = Λ A. Λ n. λ xs. length (elimCast xs -(castVecList ·A -n)).
+
+-- Granted, for this small example the reuse wasn't worth much. But you can
+-- imagine writing a much more complicated function than `length` over lists and
+-- wanting to reuse it for Vectors. Also, we *can* write casts from List to Vec,
+-- though I will save that for a later video on generic zero-cost proof reuse.
+-- For now, it's worth nothing that you get the following property absolutely
+-- for free when lifting functions using casts:
+
+test-length-eq ◂ {length ≃ vlength} = β.
+
+{- Conclusion -}
+-- That concludes this video on Cedille, I hope you enjoyed it. The next video
+-- will be a proof of Tarski's fixpoint theorem which you can use in Cedille to
+-- define recursive types. Crucially, the development relies on the machinery
+-- for casts. See you then!
+
+{- Bonus: Kleene trick -}
+-- For those of you willing to wade through the code, a little easter egg for
+-- you: The Kleene trick! I will be covering it in a later video, but for now a
+-- sneak-peak.
+
+-- So, previously we said that β can have different erasures besides the
+-- identity λ x. x. The natural question is what other kinds of erasures. Well,
+-- in Cedille -- it can be anything! Any untyped term at all can prove an
+-- obviously true equality, and as a consequence in Cedille we can write a type
+-- for otherwise untypable terms:
+
+Top ◂ ★ = { λ x. x ≃ λ x. x }.
+omega ◂ Top = β{(λ x. x x) (λ x. x x)}.
+
+-- The intuitive justification for this comes from Kleene's numeric
+-- realizability, which holds that any term at all can prove a "trivially" true
+-- equation. This of course has some strange implications: Cedille is logically
+-- sound, but also Turing complete! Furthermore, strong normalization does not
+-- hold. In essence, the guarantees you get about the behavior of a term come
+-- almost entirely from the types they have: you have no guarantee of
+-- normalization for a term with uninformative type Top, but other stronger
+-- types do indeed have only terminating terms.
+
