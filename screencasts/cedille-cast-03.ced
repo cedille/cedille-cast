@@ -1,24 +1,31 @@
 module cedille-cast-03.
 
+{-
+-- ρ    \R
+-- ς    \y
+-- δ    \d
+-- ➾    \-
+-- φ    \p
+-}
+
 {- Equality and Zero-cost Coercions -}
 
 -- Hello again and welcome to the Cedille Cast, a series of videos on writing
--- programs and proofs in Cedille. In the previous two videos we how to derive
--- induction for λ-encodings of data-types in a pure type theory, rather than
--- adding them to the theory as primitive. We saw that this was achived by
--- adding three new typing constructs to the calculus of constructions:
--- dependent intersection types, implicit products, and untyped equality.
+-- programs and proofs in Cedille. In the previous two videos we saw how to
+-- derive induction for λ-encodings of data-types rather than adding them to the
+-- theory as primitive. This was achived by adding three new typing constructs
+-- to the calculus of constructions: dependent intersection types, implicit
+-- products, and untyped equality.
 --
--- Now, you may at this point be wondering about the implications of adding
--- these constructs to the language. Is their only purpose for yielding
--- inductive datatypes in a small core theory, or are there perhaps some other
--- interesting things that can be accomplished with them? In this video, we will
--- answer this question in the positive by showing how to define terms
--- representing zero-cost coercions between types and proofs that a term has two
--- different types. Doing so lays the groundwork for future videos covering how
--- to achieve generic zero-cost proof and program reuse in Cedille, and also
--- explores some of the seemingly strange consequences of Cedille's type theory
--- being Curry-style.
+-- Now, you be wondering about the implications of adding these constructs to
+-- the language. Is their only purpose for yielding inductive datatypes in a
+-- small core theory, or are there perhaps some other interesting things that
+-- can be accomplished with them? In this video, we will answer this question in
+-- the affirmative by showing how to define terms representing zero-cost
+-- coercions between types. Doing so lays the groundwork for future videos
+-- covering generic zero-cost proof and program reuse in Cedille, generic
+-- derivations of inductions for datatypes, and also explores some of the
+-- seemingly strange consequences of Cedille's Curry-style type theory.
 
 {- Equality: Reflexivity -}
 -- Let us start by looking at equality in Cedille again. As mentioned
@@ -34,20 +41,21 @@ test-refl-η  ◂ {λ x. x ≃ λ x. λ y. x y} = β.
 -- type annotation for proving equality that gets erased to a λ-term. In the
 -- examples above, β erases to λ x. x. For those of you familiar with Leibniz
 -- equality in the Calculus of Constructions, that should seem fairly intutive.
--- However, as we'll see shortly λ x. x is not the *only* possible erasure for
--- β.
+-- However, I must mention that this is *not* the only term that β might erase
+-- to, just the one it erases to by default. The subject of what witnesses of an
+-- equality erase to will be covered in another video.
 
--- Another thing: it should be immediately obvious that because equality is over
--- untyped terms that type-checking is undecidable:
+-- Now, another thing: it should be immediately obvious that because equality is
+-- over untyped terms that type-checking is undecidable:
 
 -- test-refl-ω  ◂ {λ x. x ≃ (λ x. x x) (λ x. x x)} = β.
 
 -- Many people might have philosophical objections to this. As a practical
--- matter, many languages with dependent types already allow you to state types
+-- matter, most languages with dependent types already allow you to state types
 -- for which conversion checking can take exceedingly long -- longer perhaps
--- even than the eventual heat-death of the universe -- even in theoretically
+-- even than the eventual heat-death of the universe -- even if theoretically
 -- they are guaranteed to terminate. And just like in those languages, in
--- practice I've found you virtually never accidentally write such a term.
+-- practice I've found you virtually never unintentionally write such a term.
 
 {- Equality: Rewrite -}
 -- Anyway, if β is our introduction form for equality, what is our elimination
@@ -119,9 +127,12 @@ intrCast-fail ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cas
 
 -- There is yet one more crucial equality primitive we have to use - φ, which
 -- corresponds to Nuprl's "direct computation" principle. That is, if two terms
--- a and b have been proven to be equal, we can use this fact to introduce a
--- term that has the same type as `a` but erases to `b`. Let's see that in
--- action:
+-- a and b have been proven to be (intentionally) equal, we can use this fact to
+-- introduce a term that has the same type as `a` but erases to `b`. Let's see
+-- that in action:
+
+phi ◂ ∀ A: ★. ∀ B: ★. Π a: A. ∀ b: B. {b ≃ a} ➾ B
+  = Λ A. Λ B. λ a. Λ b. Λ eq. φ eq - b {a}.
 
 intrCast ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A ·B
   = Λ A. Λ B. λ f. λ eq. [ f , φ ς eq - (ρ eq - β) {f} ].
@@ -134,14 +145,12 @@ intrCast ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A
 -- what the entire φ expression erases to.
 
 -- φ brings a lot of power, perhaps more than what you would expect. In
--- particular, you may be concerned by the definition of `intrCast` that the
+-- particular, you might think that, by the definition of `intrCast`, that the
 -- only kinds of casts you can make use of are those of functions *already*
--- equal to the identity function. If you have such an `f` lying around, why do
--- you even need the Cast machinery? The answer is that with φ, we can introduce
--- casts with *extensional* identities. `f` might not literally be the identity
--- λ x. x, but if at a certain type it behaves *extensionally* like an identity,
--- then we can use this to create a cast function that *is intentionally* the
--- identity λ x. x.
+-- equal to the identity function. However, with φ we can introduce casts with
+-- *extensional* identities. `f` might not literally be the identity λ x. x, but
+-- if at a certain type it behaves *extensionally* like an identity, then we can
+-- use this to create a cast function that *is intentionally* the identity.
 
 intrCastExt ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. (Π a: A. {f a ≃ a}) ➔ Cast ·A ·B
   = Λ A. Λ B. λ f. λ ext. [ λ x. φ (ext x) - (f x) {x} , β ].
