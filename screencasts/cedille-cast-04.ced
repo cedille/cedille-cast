@@ -1,0 +1,249 @@
+module cedille-cast-04.
+
+{-
+Hello again and welcome back to the Cedille Cast, a series of videos on writing
+programs and proofs in Cedille. In the last video we saw how to derive zero-cost
+coercions between types using dependent intersections, equality, and a new
+construct `phi` that allows you to, essentially, change the type of one term to
+the type of another term, provided the two terms are equal.
+
+The obvious application of zero-cost coercions is zero-cost program, proof, and
+data reuse, and in a future video we will cover that topic in more-depth, but
+today's video will be about a much more subtle use: using casts to generically
+derive equi-recursive types via Tarski's fixpoint theorem!
+
+First, a short primer on recursive types: you are probably already familiar with
+them at some intutive level, especially if you use languages like Haskell, ML,
+or languages with dependent types. Any natural number is *either* zero *or* the
+successor of another natural number; any list is either nil *or* the cons of
+some data with another list. One way to model these and other such types is as
+the least fix-point of a functor. For example, the type of natural numbers would
+be the least fix-point of
+-}
+
+NatF ◂ ★ ➔ ★ = λ R: ★. ∀ X: ★. X ➔ (R ➔ X ➔ X) ➔ X.
+
+{-
+This should look familiar -- it looks like the type of Church encoding of
+numbers where we now have access to the recursive occurence -- our predecessor
+in the successor case -- direclty. This is known as the Church-Scott or Parigot
+encoding.
+
+Let's give a few example terms to build an intuition here. In this
+formulation, the terms `zero`, `one`, etc, have an infinite number of types:
+-}
+
+zero1 ◂ ∀ R: ★. NatF ·R
+  = Λ R. Λ X. λ z. λ s. z.
+
+zero2 ◂ ∀ R: ★. NatF ·(NatF ·R)
+  = Λ R. Λ X. λ z. λ s. z.
+
+one1 ◂ ∀ R: ★. NatF ·(NatF ·R)
+  = Λ R. Λ X. λ z. λ s. s (zero1 ·R) z.
+
+one2 ◂ ∀ R: ★. NatF ·(NatF ·(NatF ·R))
+  = Λ R. Λ X. λ z. λ s. s (zero2 ·R) z.
+
+{-
+And so on for all levels of nesting, and all numbers. In Cedille, we can see
+that `zero1` and `zero2`, and that `one1` and `one2`, are indeed equal:
+-}
+
+eq-zero ◂ {zero1 ≃ zero2} = β.
+eq-one  ◂ {one1  ≃ one2}  = β.
+
+{-
+It should be clear that the most `correct` type for each number is the fix-point
+of the functor `NatF`. Now, Cedille does not have built-in support for defining
+recursive types, but with Tarski's fixpoint theorem, casts, and impredicativity,
+we are able to /derive/ them.
+
+The first thing we need is some notion of monotonicity. In mathematics, a
+function `f` is monotonic if, when we have a <= b, we have f(a) <= f(b), for
+some notion of "less than or equal to". Fortunately for us, we already *have*
+such a notion -- casts! If there is a cast from A to B, then essentially every
+term of type A is also a term of type B; or, the type A is "contained within"
+the type B. Here is our definition of monotonicity:
+-}
+
+import cast.
+
+Monotonic ◂ (★ ➔ ★) ➔ ★
+  = λ F: ★ ➔ ★. ∀ A: ★. ∀ B: ★. Cast ·A ·B ➔ Cast ·(F ·A) ·(F ·B).
+
+{-
+The next bit of kit we need is a notion of an F-closed type. Here, some type A
+being F-closed means that F(A) <= A -- or, with our toolkit:
+-}
+
+F-Closed ◂ (★ ➔ ★) ➔ ★ ➔ ★
+  = λ F: ★ ➔ ★. λ A: ★. Cast ·(F ·A) ·A.
+
+{-
+And with that we can define our family, or set, of F-Closed types
+-}
+
+F-Closed-Set ◂ (★ ➔ ★) ➔ ★ ➔ ★
+  = λ F: ★ ➔ ★. λ A: ★. F-Closed ·F ·A ➾ A.
+
+{-
+This is an approximation of the mathematical notation { a | f(a) <= a}. We want
+a family of types which is F-Closed, and for a particular type A this is modeled
+as a function which takes a proof that A is F-closed and returns a term of type
+A. Note also that we take the proof that A is F-Closed implicitly (erased).
+
+We are now almost ready to define our candidate type-constructor `Fix` as the
+greatest lower bound of the set of all F-Closed types. We need one more thing --
+a notion of a "meet" or minimum of a set. If we can find the meet of our set of
+F-Closed types, and show that is the /minimum/ of that set (meaning that it is
+indeed in the set), it is necessarily the greatest lower bound.
+
+Perhaps surprisingly, universal quantification is exactly what we need here! If
+you view the semantics of types as denoting sets of (untyped) terms, you can
+think of universal quantification as a kind of intersection of a family of sets.
+And intersection, of course, is a very intuitive meet operation for sets. For
+example, consider the empty list, nil. We'll just use the regular old Church
+encoding for brevity here:
+-}
+
+List ◂ ★ ➔ ★ = λ A: ★. ∀ X: ★. X ➔ (A ➔ X ➔ X) ➔ X.
+nil ◂ ∀ A: ★. List ·A
+  = Λ A. Λ X. λ n. λ c. n.
+
+{-
+`nil` is a term that is in the intersection of List ·Nat, List ·Bool, List ·Bot,
+etc.
+
+So, let take the intersection of the set of F-Closed types to define our
+candidate greatest lower bound.
+-}
+
+Fix ◂ (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ A: ★. F-Closed-Set ·F ·A.
+
+{-
+Let's just take a moment to recap what we've done. So far, all we have are some
+definitions translated into type-theory from Tarski's fix-point theorem, and a
+candidate fix-point of F as the greatest lower-bound of the set of F-closed
+types. We have /yet/ to show that Fix ·F is indeed a fix-point, but that's what
+we will do now.
+
+First, we need a lemma stating that Fix ·F really is a lower bound (infimum) to any
+F-closed type
+-}
+
+castFix ◂ ∀ F: ★ ➔ ★. ∀ A: ★. F-Closed ·F ·A ➾ Cast ·(Fix ·F) ·A
+  = Λ F. Λ A. Λ c. intrCast (λ fix. fix ·A -c) (λ _. β).
+
+-- 1. we introduce a cast with `intrCast`
+-- 2. the first argument is a function from Fix ·F to A, intro λ fix. ●
+-- 3. by definition, fix is in the intersection of every F-Closed set, so it is
+--    in A as well, fix ·A -c
+-- 4. the second argument is a proof that our function behaves like an identity
+--    function. Fortunately for us, it is definitionally an identify function,
+--    intro λ _. β
+
+{-
+Now we are, finally, ready for the two main parts of the proof. To show that Fix
+·F really is a fixpoint of F, we need to show that Fix ·F <= F ·(Fix ·F) *and*
+to show that F ·(Fix ·F) <= Fix ·F. This corresponds to in and out, or roll and
+unroll, for recursive types
+-}
+
+castInFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(F ·(Fix ·F)) ·(Fix ·F)
+  = Λ F. Λ mono.
+  [ f : F ·(Fix ·F) ➔ Fix ·F
+    = λ x. Λ A. Λ fc. elimCast -fc (elimCast -(mono (castFix -fc)) x) ]
+  - intrCast f (λ _. β).
+
+-- 1. introduce the args
+-- 2. introduce the cast, intrCast ● ●
+-- 3. let-binding for the function and intro args λ x. ●
+-- 4. to produce a Fix ·F, we need a way to generate any F-Closed type A, Λ A. Λ
+--    fc. ●
+-- 5. We know we can produce an A from an F ·A because A is F-Closed, elimCast
+--    -fc ●
+-- 6. We know we can produce F ·A from F ·(Fix ·F) if we can produce A from Fix
+--    ·F, intro elimCast -(mono ●) ●
+-- 7. We have such a cast in castFix, intro -fc
+-- 8. And we have x as our F ·(Fix ·F)
+-- 9. Finish of by giving intrCast its arguments
+--    Noting again how, magically, our let-bound `f` is an identity function
+
+inFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castInFix -mono).
+
+{-
+Finally, the other proof (which is fortunately much easier)
+-}
+
+castOutFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(Fix ·F) ·(F ·(Fix ·F))
+  = Λ F. Λ mono.
+  [ f : Fix ·F ➔ F ·(Fix ·F)
+    = λ x. x ·(F ·(Fix ·F)) -(mono (castInFix -mono))]
+  - intrCast f (λ _. β).
+
+-- 1. introduce the args and app, Λ F. Λ mono. intrCast ● ●
+-- 2. add a let-binding for f
+-- 3. we know Fix ·F is in any F-closed type, so lets show that F ·(Fix ·F) is
+--    F-closed, x ·(F ·(Fix ·F)) -●
+-- 4. meaning we need a cast from F ·(F ·(Fix ·F)) to F ·(Fix ·F). Using mono,
+--    we can go under the outermost F if we have a cast F ·(Fix ·F) to Fix ·F,
+--    intro mono ●
+-- 5. `inFix -mono` gives us that!
+-- 6. conclude
+
+outFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castOutFix -mono).
+
+{-
+Phew! One more thing to note before we round this video out with a concrete
+example: what we have defined are equi-recursive types. The same set of terms
+inhabits Fix ·F and F ·(Fix ·F), as established by these two computation laws.
+-}
+
+fixEqui1 ◂ ∀ F: ★ ➔ ★. ∀ x: Fix ·F.      {outFix x ≃ x} = Λ _. Λ _. β.
+fixEqui2 ◂ ∀ F: ★ ➔ ★. ∀ x: F ·(Fix ·F). {inFix  x ≃ x} = Λ _. Λ _. β.
+
+{-
+Let's finish things off with a concrete example. Define the type of
+(parigot-encoded) natural numbers, Nat, as the fix-point of NatF
+-}
+
+Nat ◂ ★ = Fix ·NatF.
+
+{-
+To make use of our developments we need to show that NatF is montonic
+-}
+
+monoNat ◂ Monotonic ·NatF
+  = Λ A. Λ B. λ c.
+  [ map : NatF ·A ➔ NatF ·B
+    = λ n. Λ X. λ z. λ s. n z (λ a. s (elimCast -c a)) ]
+  - intrCast map (λ _. β).
+
+{-
+Let us also define some helper functions for the `in` and `out` specialized to Nat
+-}
+
+inNat  = inFix -monoNat.
+outNat = outFix -monoNat.
+
+{-
+Now we can define the two constructors for Nat, zero and succ
+-}
+
+zero ◂ Nat
+  = inNat (Λ X. λ z. λ s. z).
+succ ◂ Nat ➔ Nat
+  = λ n. inNat (Λ X. λ z. λ s. s n (outNat n z s)).
+
+one = succ zero.
+
+{-
+And top it all off with a simple definition: addition on natural numbers!
+-}
+
+add ◂ Nat ➔ Nat ➔ Nat
+  = λ m. λ n. (outNat m) n (λ _. λ sum. succ sum).
+
+pred ◂ Nat ➔ Nat
+  = λ n. (outNat n) n (λ p. λ _. p).
