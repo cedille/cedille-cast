@@ -8,26 +8,30 @@ construct `phi` that allows you to, essentially, change the type of one term to
 the type of another term, provided the two terms are equal.
 
 The obvious application of zero-cost coercions is zero-cost program, proof, and
-data reuse, and in a future video we will cover that topic in more-depth, but
+data reuse, and in a future video we will cover that topic in more depth, but
 today's video will be about a much more subtle use: using casts to generically
 derive equi-recursive types via Tarski's fixpoint theorem!
 
 First, a short primer on recursive types: you are probably already familiar with
 them at some intutive level, especially if you use languages like Haskell, ML,
-or languages with dependent types. Any natural number is *either* zero *or* the
-successor of another natural number; any list is either nil *or* the cons of
-some data with another list. One way to model these and other such types is as
-the least fix-point of a functor. For example, the type of natural numbers would
-be the least fix-point of
+or languages with dependent types. For an example, any natural number is
+*either* zero *or* the successor of another natural number; any list is either
+nil *or* the cons of some data with another list. Note the recursion inherent in
+the definition of these types. One way to model these and other such types is as
+the least fix-point of a functor whose parameter is a type representing the
+"recursive occurence" of the type you want to define. For example, natural
+numbers would be the least fix-point of
 -}
 
 NatF ◂ ★ ➔ ★ = λ R: ★. ∀ X: ★. X ➔ (R ➔ X ➔ X) ➔ X.
 
 {-
-This should look familiar -- it looks like the type of Church encoding of
-numbers where we now have access to the recursive occurence -- our predecessor
-in the successor case -- direclty. This is known as the Church-Scott or Parigot
-encoding.
+Our functor, NatF, takes a parameter R representing the recursive occurence of
+the data-type we are defining. In the successor case, we now not only have
+access to the previously computed value -- this X -- but also the number used to
+compute that value, or in otherwords the predecessor -- this R. This is known as
+the Church-Scott or Parigot encoding, and represents numbers as their own
+recursors, rather than their own iterators as in the Church encoding.
 
 Let's give a few example terms to build an intuition here. In this
 formulation, the terms `zero`, `one`, etc, have an infinite number of types:
@@ -60,17 +64,17 @@ recursive types, but with Tarski's fixpoint theorem, casts, and impredicativity,
 we are able to /derive/ them.
 
 The first thing we need is some notion of monotonicity. In mathematics, a
-function `f` is monotonic if, when we have a <= b, we have f(a) <= f(b), for
+function `f` is monotonic if, when we have x <= y, we have f(x) <= f(y), for
 some notion of "less than or equal to". Fortunately for us, we already *have*
-such a notion -- casts! If there is a cast from A to B, then essentially every
-term of type A is also a term of type B; or, the type A is "contained within"
-the type B. Here is our definition of monotonicity:
+such a notion -- casts! If there is a cast from X to Y, then essentially every
+term of type X is also a term of type Y; or, the type X is "contained within"
+the type X. Here is our definition of monotonicity:
 -}
 
 import cast.
 
 Monotonic ◂ (★ ➔ ★) ➔ ★
-  = λ F: ★ ➔ ★. ∀ A: ★. ∀ B: ★. Cast ·A ·B ➔ Cast ·(F ·A) ·(F ·B).
+  = λ F: ★ ➔ ★. ∀ X: ★. ∀ Y: ★. Cast ·X ·Y ➔ Cast ·(F ·X) ·(F ·Y).
 
 {-
 The next bit of kit we need is a notion of an F-closed type. Here, some type A
@@ -81,18 +85,6 @@ F-Closed ◂ (★ ➔ ★) ➔ ★ ➔ ★
   = λ F: ★ ➔ ★. λ A: ★. Cast ·(F ·A) ·A.
 
 {-
-And with that we can define our family, or set, of F-Closed types
--}
-
-F-Closed-Set ◂ (★ ➔ ★) ➔ ★ ➔ ★
-  = λ F: ★ ➔ ★. λ A: ★. F-Closed ·F ·A ➾ A.
-
-{-
-This is an approximation of the mathematical notation { a | f(a) <= a}. We want
-a family of types which is F-Closed, and for a particular type A this is modeled
-as a function which takes a proof that A is F-closed and returns a term of type
-A. Note also that we take the proof that A is F-Closed implicitly (erased).
-
 We are now almost ready to define our candidate type-constructor `Fix` as the
 greatest lower bound of the set of all F-Closed types. We need one more thing --
 a notion of a "meet" or minimum of a set. If we can find the meet of our set of
@@ -116,12 +108,15 @@ nil ◂ ∀ A: ★. List ·A
 etc.
 
 So, let take the intersection of the set of F-Closed types to define our
-candidate greatest lower bound.
+candidate greatest lower bound -- our candidate fixpoint of
 -}
 
-Fix ◂ (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ A: ★. F-Closed-Set ·F ·A.
+Fix ◂ (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ A: ★. F-Closed ·F ·A ➾ A.
 
 {-
+`Fix` is the intersection (via universal quantification) of all types `A` --
+that are F-Closed.
+
 Let's just take a moment to recap what we've done. So far, all we have are some
 definitions translated into type-theory from Tarski's fix-point theorem, and a
 candidate fix-point of F as the greatest lower-bound of the set of F-closed
@@ -170,10 +165,8 @@ castInFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(F ·(Fix ·F)) ·(Fi
 -- 9. Finish of by giving intrCast its arguments
 --    Noting again how, magically, our let-bound `f` is an identity function
 
-inFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castInFix -mono).
-
 {-
-Finally, the other proof (which is fortunately much easier)
+Fiinfnally, the other proof (which is fortunately much easier)
 -}
 
 castOutFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(Fix ·F) ·(F ·(Fix ·F))
@@ -192,13 +185,14 @@ castOutFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(Fix ·F) ·(F ·(Fi
 -- 5. `inFix -mono` gives us that!
 -- 6. conclude
 
-outFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castOutFix -mono).
-
 {-
 Phew! One more thing to note before we round this video out with a concrete
 example: what we have defined are equi-recursive types. The same set of terms
 inhabits Fix ·F and F ·(Fix ·F), as established by these two computation laws.
 -}
+
+inFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castInFix -mono).
+outFix = Λ F: ★ ➔ ★. Λ mono: Monotonic ·F. elimCast -(castOutFix -mono).
 
 fixEqui1 ◂ ∀ F: ★ ➔ ★. ∀ x: Fix ·F.      {outFix x ≃ x} = Λ _. Λ _. β.
 fixEqui2 ◂ ∀ F: ★ ➔ ★. ∀ x: F ·(Fix ·F). {inFix  x ≃ x} = Λ _. Λ _. β.
@@ -245,5 +239,8 @@ And top it all off with a simple definition: addition on natural numbers!
 add ◂ Nat ➔ Nat ➔ Nat
   = λ m. λ n. (outNat m) n (λ _. λ sum. succ sum).
 
-pred ◂ Nat ➔ Nat
-  = λ n. (outNat n) n (λ p. λ _. p).
+{-
+That concludes this video. I don't know now what topic I will cover in the next
+one, but hopefully I'll another one up early next month. Until then, happy new
+year to all of you, and see you next time!
+-}
