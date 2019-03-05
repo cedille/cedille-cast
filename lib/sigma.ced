@@ -18,9 +18,13 @@ Sigma ◂ Π A : ★ . (A ➔ ★) ➔ ★ =
     ι d : cSigma · A · PA .
     ι _ : {d mkcsigma ≃ d} . param-Sigma · A · PA d .
 
+Pair ◂ ★ ➔ ★ ➔ ★ = λ A: ★. λ B: ★. Sigma ·A ·(λ _: A. B).
+
 mksigma ◂ ∀ X : ★ . ∀ Y : X ➔ ★ . Π x : X . Y x ➔ Sigma · X · Y =
  Λ X . Λ Y . λ x . λ y . [ mkcsigma · X · Y x y , [ β{mkcsigma x y}  , Λ X' . Λ Q . Λ pr . λ e . e x y  ] ] .
 
+pair : ∀ X: ★. ∀ Y: ★. X ➔ Y ➔ Pair ·X ·Y
+  = Λ X. Λ Y. λ x. λ y. mksigma x y.
 
 ind-sigma ◂ ∀ A : ★ . ∀ B : A ➔ ★ . Π x : Sigma · A · B .
  ∀ P : Sigma · A · B ➔ ★ . (Π a : A . Π b : B a . P (mksigma · A · B a b)) ➔ P x
