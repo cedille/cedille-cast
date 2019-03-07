@@ -1,27 +1,27 @@
 module cedille-cast-05.
 
 {- Hello and welcome back to the Cedille Cast. This video is the start of a
--- multi-part sequence covering a much requested topic: The generic derivation
+-- multi-part sequence covering the generic derivation
 -- of induction for efficient Mendler-style Lambda-encodings in Cedille. This
--- developent comes from a recently published paper in the conference on
+-- development comes from a recently published paper in the conference on
 -- Interactive Theorem Proving. A link to an ArXiv version of the paper and
 -- refactored code base is in the video description.
 --
 -- [ArXiv Paper](https://arxiv.org/abs/1803.02473v1)
 -- [Refactored code](https://github.com/cedille/cedille-developments/tree/master/efficient-mendler-prime)
 --
--- We will first begin with some background and motivation: what does a generic
--- derivation of induction look like? What do we mean by efficient λ-encodings?
--- And what is the "Mendler style" of encoding?
+-- We will first begin with some background: functors, algebras, initial
+-- algebras, and Mendler-style algebras.
 -}
 
 {- Datatypes and their signature functors
 -- =============================================================================
--- It is well known by now that datatypes can be represented as the least
+-- It is well known already that datatypes can be represented as the least
 -- fixed-points of their signature functors: that is to say, a functor formed by
--- the sum-of-products of its constructors, with recursive occurrences of the
--- datatype in constructor arguments replaced by the functor argument. For
--- example, the datatype Nat and List can have the following signature functors:
+-- a sum-of-products based on the types of its constructors, with recursive
+-- occurrences of the datatype in constructor arguments replaced by the functor
+-- parameter. For example, the datatype Nat and List can have the following
+-- signature functors:
 -}
 
 import unit.
@@ -32,11 +32,11 @@ NatF : ★ ➔ ★ = λ R: ★. Sum ·Unit ·R.
 ListF : ★ ➔ ★ ➔ ★ = λ A: ★. λ R: ★. Sum ·Unit ·(Pair ·A ·R).
 
 {- A `Nat` is a sum type, with the left component the unit type (representing
--- zero) and the right component a recursive occurence of Nat, with the type
+-- zero) and the right component a recursive occurrence of Nat, with the type
 -- parameter `R` a placeholder for this. A similar reading holds for Lists
 --
 -- We saw something like this already in the previous video on deriving Tarksi's
--- least fixpoint theorem for monotonic functions over a complete lattice.
+-- theorem for least fixpoints of monotonic functions over a complete lattice.
 -- However, the fixpoint we will derive for these functors in this video is
 -- different: it will be the carrier of their initial algebras.
 --
@@ -61,22 +61,35 @@ isEvenAlg : Alg ·NatF ·Bool = λ n. case n (λ _. tt) not.
 -- Initial F-Algebras
 -- -----------------------------------------------------------------------------
 {- An initial F-algebra is, intuitively, the best or most general algebra: one
--- from which all other algebras may be defined. With impredicative
+-- which has a special relationship with every other F-algebra. With impredicative
 -- quantification, we can define the carrier of the initial algebra, and thus
 -- the algebra itself, in a very concise manner. This carrier *is* the
--- representation of the inductive datatype
+-- representation of and inductive datatype
 -}
 
 Fix : (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ X: ★. Alg ·F ·X ➔ X.
 
-{- Operationally, the definition of Fix ·F says that it is the type of functions
--- that, for any other carrier X, it can satisfy the requiremnts of an F algebra
--- with this carrier and produce the desired result. Continuing with the
--- example above, we may define isEven over Nat (as the Fix of NatF) using the
--- algebra we defined above.
+{- Operationally, the definition of Fix says that it is the type of functions
+-- that, for any F and carrier X, it can satisfy the requirements of an F algebra
+-- over this carrier to produce the desired result.
+--
+-- The special relationship between the initial F-algebra and every other
+-- F-algebra is the existence of a unique `fold` function (categorically, a
+-- catamorphism), which is a generalization of fold over lists. This is defined
+-- in Cedille as a function that takes any algebra and produces a map between
+-- Fix ·F and its carrier. 
 -}
 
-isEven : Fix ·NatF ➔ Bool = λ n. n isEvenAlg.
+fold : ∀ F: ★ ➔ ★. ∀ X: ★. Alg ·F ·X ➔ Fix ·F ➔ X
+  = Λ F. Λ X. λ alg. λ d. d alg.
+
+{-
+-- Continuing with the
+-- example above, we may define isEven over Nat (`Fix ·NatF`) as a fold of the
+-- `isEven` algebra we defined above:
+-}
+
+isEven : Fix ·NatF ➔ Bool = fold isEvenAlg.
 
 {- Everything we have covered so far is fairly well known, with perhaps the
 -- impredicative encoding of Fix being less familiar than the more usual
@@ -84,7 +97,7 @@ isEven : Fix ·NatF ➔ Bool = λ n. n isEvenAlg.
 -- begin pivoting to the new concepts, let us first observe that the definition
 -- of Nat as `Fix ·NatF` has a big drawback: similar to the Church-encoding of
 -- numbers, computing predecessor for these takes linear time, because the
--- algebras are required to work directly with previously computed results,
+-- algebras are required to work with previously computed results,
 -- rather than directly with the subdata.
 -}
 
@@ -98,33 +111,39 @@ isEven : Fix ·NatF ➔ Bool = λ n. n isEvenAlg.
 AlgM : (★ ➔ ★) ➔ ★ ➔ ★ = λ F: ★ ➔ ★. λ X: ★. ∀ R: ★. (R ➔ X) ➔ F ·R ➔ X.
 
 {- The quantified type `R` should be seen as the type of data on which it is
--- legal to make recursive calls on. The algebra is equiped explicitly with a
+-- legal to make recursive calls on. The algebra is equipped explicitly with a
 -- function to make such calls, of type `R ➔ X`. Reading this type signature
 -- parametrically, the algebra is given some unfolded data `F ·R`, and the only
 -- type-correct thing it can do with the `R` subterms is make a recursive call
 -- with its first argument.
 --
--- The carrier of the initial Mendler-style algebra is defined similarly to the above:
+-- The carrier of the initial Mendler-style algebra is defined similarly to the
+-- above:
 -}
 
 FixM : (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ X: ★. AlgM ·F ·X ➔ X.
 
-{- Let's use the same `isEven` example with Mendler algebras to demonstrate the difference
+{- Let's use the same `isEven` example with Mendler algebras to demonstrate the
+-- difference
 -}
 
-isEvenAlgM : AlgM ·NatF ·Bool = Λ R. λ rec. λ n. case n (λ _. tt) (λ n. not (rec n)).
+isEvenAlgM : AlgM ·NatF ·Bool
+  = Λ R. λ rec. λ n. case n (λ _. tt) (λ n. not (rec n)).
 
-isEvenM : FixM ·NatF ➔ Bool = λ n. n isEvenAlgM.
+foldM : ∀ F: ★ ➔ ★. ∀ X: ★. AlgM ·F ·X ➔ FixM ·F ➔ X
+  = Λ F. Λ X. λ alg. λ d. d alg.
+
+isEvenM : FixM ·NatF ➔ Bool = foldM isEvenAlgM.
 
 {- Generic Constructors and Destructors
 -- =============================================================================
 -- We conclude this video by making a start on some generic definitions: the
 -- fixpoint rolling and unrolling functions for any functor F. Viewers familiar
 -- with recursive types will note that so far we have made no appeals to
--- monotonicity (that is, positivity or covariance) of our functors. This will
--- prevent us from defining `out`, the unrolling function. The next video will
+-- monotonicity (that is, positivity or covariance) of our functors. Positivity
+-- is needed to define `out`, the unrolling function. The next video will
 -- provide the tools to finish the definition in terms of the `Id` type, which
--- similar to the Cast type we saw in video 3 is a type of zero-cost coercion
+-- similar to the Cast type we saw in previous videos is a type of zero-cost coercion
 -- that can be used to define positivity.
 --
 -- Our generic rolling function, `in`, takes some F ·(FixM ·F) and produces a
@@ -133,21 +152,27 @@ isEvenM : FixM ·NatF ➔ Bool = λ n. n isEvenAlgM.
 -}
 
 in : ∀ F: ★ ➔ ★. F ·(FixM ·F) ➔ FixM ·F
-  = Λ F. λ d. Λ X. λ a. a ·(FixM ·F) (λ c. c a) d.
+  = Λ F. λ d. Λ X. λ a. a ·(FixM ·F) (foldM a) d.
 
 {- Ordinarily, you define `out` in terms of `in` and assuming that F is a
 -- functor: that is, that is has an fmap lifting A ➔ B to F ·A ➔ F ·B
 -}
 
-out' : ∀ F: ★ ➔ ★. (∀ A: ★. ∀ B: ★. (A ➔ B) ➔ F ·A ➔ F ·B) ➔ FixM ·F ➔ F ·(FixM ·F)
+out : ∀ F: ★ ➔ ★. FixM ·F ➔ F ·(FixM ·F)
+  = Λ F. λ d. d ·(F ·(FixM ·F)) (Λ R. λ rec. λ fr. ●).
+
+Functor : (★ ➔ ★) ➔ ★ = λ F: ★ ➔ ★. ∀ A: ★. ∀ B: ★. (A ➔ B) ➔ F ·A ➔ F ·B.
+
+out' : ∀ F: ★ ➔ ★. Functor ·F ➔ FixM ·F ➔ F ·(FixM ·F)
   = Λ F. λ fmap. λ d. d ·(F ·(FixM ·F)) (
     Λ R. λ rec. λ fr. fmap (λ r: R. in (rec r)) fr).
 
-{- The approach used for generically deriving induction instead requires
--- the existence of a zero-cost cast between the abstract type `R` and and `FixM
--- ·F`, and a mapping function for `F` defined only for such casts. We will
--- define these concepts, and give the definition of `out` in terms of them, in
--- the next video.
+{- This approach can also be used for generically deriving induction, provided
+-- that `F` and its mapping function `fmap` satisfy the functor laws. The
+-- approach we will be using here instead requires the existence of a zero-cost
+-- cast between the abstract type `R` and and `FixM ·F`, and a mapping function
+-- for `F` defined only for such casts. We will define these concepts and use
+-- them to augment our definition of a Mendler-style algebra in the next video.
 --
--- THanks for watching, and hope to see you in the next one!
+-- Thanks for watching, and hope to see then!
 -}
