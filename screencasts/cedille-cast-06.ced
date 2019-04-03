@@ -1,0 +1,282 @@
+module cedille-cast-06.
+
+{- Hello everyone, and welcome back to the Cedille cast. In this month's video I
+-- am interupting the sequence on the generic derivation of induction for
+-- datatypes in Cedille, to announce the release of Cedille 1.1, which includes
+-- syntax for declaring inductive datatypes and defining functions over them
+-- using case analysis and recursion! This is no April Fool's joke: the syntax
+-- for declarations and recursive definitions is /elaborated/ to Cedille's core
+-- theory without further extension to said theory, all thanks to the generic
+-- derivation of induction which we will continue to see next episode.
+--
+-- First we'll see a basic example of an inductive definition (Nat) and some
+-- functions defined over it.
+-}
+
+data Nat: ★ =
+  | zero: Nat
+  | suc: Nat ➔ Nat.
+
+{- Datatypes are introduced with the keyword `data`, the name of the type, its
+-- parameters and indices (not needed for Nat), and a list of constructors for
+-- the type.
+--
+-- To define a function by case analysis, we use the "Mu Prime" operator. Here
+-- we will use it to define predecessor for Nat.
+-}
+
+pred : Nat ➔ Nat
+= λ n. μ' n {zero ➔ n | suc n ➔ n}.
+
+{- Mu' takes a scrutinee and a case tree associating constructor patterns to
+-- expressions.
+--
+-- We can also make recursive definitions with the "Mu" operator. Here we will
+-- use it to define addition for Nat.
+-}
+
+add : Nat ➔ Nat ➔ Nat
+= λ m. λ n. μ addN. m {zero ➔ n | suc m ➔ suc (addN m)}.
+
+{- In `add`, μ binds name `addN` as the recursive function being defined over
+-- the scrutinee `m`. `addN` is then available to make recursive calls with
+-- inside the branches of the case tree.
+--
+-- Before moving on to show examples of indexed types and proofs by induction, I
+-- want to re-emphasize that everything above is high-level syntax for datatypes
+-- and functions already derivable in CDLE -- and to prove this, I can even show
+-- you the elaborated terms!
+--
+-- If I press capital E, and provide a directory, Cedille will elaborate all of
+-- the definitions so far to a a file with the same name but with extension
+-- .cdle. .cdle files are checked with a different tool: Cedille Core, a
+-- mininmal implementation of Cedille's core theory in Haskell. As we can see,
+-- that tool tells us this file type checks!
+--
+-- Due to limitations in our Emacs front-end, these large files often can't be
+-- checked by Cedille mode. In this particular case, however, if I switch with
+-- `M-x cedille-mode`, type check, and edit out the long wait
+--
+-- We can see the elaborated file is also valid Cedille, and scrolling towards
+-- the botton can begin to see the translation of Nat, pred, and add. The
+-- definitions at the begining are from the generic derivation of induction,
+-- which we will be covering in later videos.
+--
+-- Returning to our examples, here is the classic `Vec` definition showing off
+-- parameterized and indexed definitions.
+-}
+
+data Vec (A: ★): Nat ➔ ★ =
+  | vnil: Vec zero
+  | vcons: ∀ n: Nat. A ➔ Vec n ➔ Vec (suc n).
+
+{- Notice that in constructor type signatures, `Vec` is not written as applied
+-- to parameters, only its indices. `A` really is a parameter to the defintion.
+--
+-- With the definitions we have so far we can of course define the append
+-- function for vectors
+-}
+
+vappend : ∀ A: ★. ∀ m: Nat. ∀ n: Nat. Vec ·A m ➔ Vec ·A n ➔ Vec ·A (add m n)
+= Λ A. Λ m. Λ n. λ xs. λ ys. μ appYs. xs @(λ i: Nat. λ x: Vec ·A i. Vec ·A (add i n)) {
+  | vnil ➔ ys
+  | vcons -i x xs ➔ vcons -(add i n) x (appYs -i xs)
+  }.
+
+{- Due to limitations in type inference, if you want to write a function over
+-- indutive families where the indices of the result type is a function over the
+-- indices of the inputs -- or in general, to write a proof for a datatype --
+-- you must use the guide syntax `@` to spell out the motive directly.
+--
+-- As is usual, in the vnil case the expected type is `Vec ·A (add zero n)`
+-- which is convertible with the type `Vec ·A n` of ys; in the vcons case, the
+-- length `i` of our tail is bound in an erased pattern (because vcons takes an
+-- erased length argument) and the head and tail are bound un-erased.
+--
+-- Now, at this point, you will be forgiven for thinking that everything shown
+-- here so far is fairly standard stuff, with lower-level facilities for case
+-- analysis and recursion than found in languages like Agda or Idris. The next
+-- definition will show a more exotic feature of Cedille's datatype system: it's
+-- semantic termination checker. We will demonstrate this by showing how to
+-- define division over natural numbers in Cedille in a way that Cedille
+-- recognizes as terminating.
+--
+-- In order to do this, the first thing we have to notice is that our
+-- declaration of type `Nat` also introduces some additional global names. These
+-- can be seein by selecting the span corresponding to the declaration and
+-- opening the inspect buffer. What you see is
+--
+-- 1. A type family "Is/Nat"
+-- 2. A member of that family, little "is/Nat" of type "Is/Nat ·Nat"
+-- 3. A type coercion function "to/Nat" that says for any type X in the type
+--    family "Is/Nat", we have a way of converting terms of type X to terms of
+--    type Nat.
+--
+-- Similar definitions are exported for each declared datatype, including for
+-- Vec above. These definitions are a part of Cedille's /semantic/, or type-based,
+-- termination checker.
+--
+-- To give an example, let us define predecessor for Nat in a way that expresses
+-- that it produces a value no larger than its argument.
+-}
+
+-- pred' : ∀ N: ★. Is/Nat ·N ➾ N ➔ N
+-- = ●.
+
+{- Instead of being defined over the concrete `Nat` type, we are polymorphic
+-- over any type N in the type family "Is/Nat".
+-}
+
+pred' : ∀ N: ★. Is/Nat ·N ➾ N ➔ N
+= Λ N. Λ is. λ n. μ'<is> n {zero ➔ n | suc n' ➔ n'}.
+
+{- We give mu prime the witness "is" explicitly with the angle brackets, and the
+-- scrutinee n of type N. Crucially, notice that in the successor case, the
+-- subdata n' *also* has type N. It would be type incorrect to, say, return suc
+-- n, or any expression that could be larger than the return argument. Reading
+-- these types parametrically, the only thing you can do with an arbitrary
+-- element of type N is either cast it back to Nat or perform case analysis
+-- on it; the only way to *return* an expression with type N is by returning the
+-- argument directly or performing case analysis.
+--
+-- In predecessor we only analyze one case, but we can in general do /arbitrary/
+-- case analysis in an abstract-type preserving way. Consider minus:
+-}
+
+minus' : ∀ N: ★. Is/Nat ·N ➾ N ➔ Nat ➔ N
+= Λ N. Λ is. λ m. λ n. μ mMinus. n {
+  | zero ➔ m
+  | suc n ➔ pred' -is (mMinus n)
+  }.
+
+{- The first number argument to minus has the abstract type N in the type family
+-- "Is/Nat". The second has the type Nat. Reading the type signature
+-- parametrically, we again see that minus' must either return its first real
+-- number argument, or some arbitrary predecessor of it -- perhaps computed using
+-- the second argument.
+--
+-- In the definition, we form a recursive definition destructing argument n. In
+-- the zero case, "mMinus" zero is m
+-- In the suc case, we take the type-preserving predecessor of 'mMinus n'
+--
+-- We need just a little bit more kit to define division. Let us introduce
+-- Booleans, if-then-else, and a less than comparator for Nat.
+-}
+
+data Bool: ★ =
+  | tt: Bool
+  | ff: Bool.
+
+ite : ∀ X: ★. Bool ➔ X ➔ X ➔ X
+= Λ X. λ b. λ t. λ f. μ' b { tt ➔ t | ff ➔ f}.
+
+lt : Nat ➔ Nat ➔ Bool
+= λ m. λ n. μ' (minus' -is/Nat (suc m) n) {zero ➔ tt | suc _ ➔ ff}.
+
+{- Note that instead of using the more general minus' in the definition of `lt`
+-- we can just as easily define a version of subtraction over numbers of the
+-- concrete `Nat` type
+-}
+
+minus = minus' -is/Nat.
+
+{- Because the application to the witness is erased, the two definitions are
+-- equal by the reflexivity rule "β" alone
+-}
+
+_ : {minus ≃ minus'} = β.
+
+{- Now, with everything, we can show how to define division by interated
+-- subtraction in Cedille that the termination checker recognizes as being OK
+-}
+
+-- div : Nat ➔ Nat ➔ Nat
+-- = λ m. λ n. μ divN. m {
+--   | zero ➔ zero
+--   | suc m ➔ ●
+--   }.
+
+{- If the dividend is zero, we of course return zero.
+-- In the successor case, we first want to test whether the dividend `suc m` is
+-- less than the divisor. But, `suc m` is not a well typed expression: at the
+-- moment, Cedille requires that if you want to use subdata from a Mu pattern as
+-- (that is, a pattern formed as part of a recursive definition) as if it had
+-- the concrete datatype, you must explicitly cast using the conversion function
+-- exported by the datatype.
+--
+-- Let's show that now:
+-}
+
+-- div : Nat ➔ Nat ➔ Nat
+-- = λ m. λ n. μ divN. m {
+--   | zero ➔ zero
+--   | suc m ➔
+--     [m' = to/Nat -isType/divN m]
+--     - ●
+--   }.
+
+{- What's going on here? Datatype declarations introduce *global* definitions
+-- for termination checking, and recursive mu-expressions introduce *local*
+-- definitions for termination checking. The names given to them are derived
+-- from the name of the recursive expression. For example, for the mu-expression
+-- defining `divN`, we have:
+--
+-- 1. Type/divN: the type of expressions for which it is legal to make recursive
+--    calls on
+-- 2. isType/divN: a local witness that any expression of type "Type/divN" is in
+--    the "Is/Nat" type family
+-- 3. "divN", our inductive hypothesis. Notice that it expects arguments of the
+--    abstract type.
+--
+-- After type coercion, we can compare the dividend and divisor, and if the
+-- former is smaller, return zero
+-}
+
+-- div : Nat ➔ Nat ➔ Nat
+-- = λ m. λ n. μ divN. m {
+--   | zero ➔ zero
+--   | suc m ➔
+--     [m' = to/Nat -isType/divN m]
+--     - ite (lt (suc m') n) zero ●
+--   }.
+
+{- Otherwise, we want to subtract the divisor from the dividend, divide the
+-- result, and add one. If we were to use the version of minus defined for
+-- regular numbers, we would get a type error
+-}
+
+-- div : Nat ➔ Nat ➔ Nat
+-- = λ m. λ n. μ divN. m {
+--   | zero ➔ zero
+--   | suc m ➔
+--     [m' = to/Nat -isType/divN n]
+--     - ite (lt (suc m') n) zero (divN (minus m' n))
+--   }.
+
+{- In languages using syntactic termination checkers, that checker would also
+-- complain about this expression: the recursive function `divN` is given as an
+-- argument some expression that is not obviously smaller than the original
+-- pattern. In Cedille, if we changes this to our *type preserving* subtraction
+-}
+
+div : Nat ➔ Nat ➔ Nat
+= λ m. λ n. μ divN. m {
+  | zero ➔ zero
+  | suc m ➔
+    [m' = to/Nat -isType/divN m]
+    - ite (lt (suc m') n) zero (divN (minus' -isType/divN m n))
+  }.
+
+{- Then the expression type checks: divN expects an argument of type
+-- `Type/divN`, and minus' m n preserves the type of its first argument.
+--
+-}
+
+{- That concludes this video, hope you enjoyed it. If you're interested in more
+-- about datatypes in Cedille, checkout out the release page and
+-- language-overview directory in the Cedille source.
+--
+-- In the next video, we will continue covering the generic derivation of
+-- induction for λ-terms done in pure CDLE that made datatypes in Cedille
+-- possible. Hope to see you then!
+-}
