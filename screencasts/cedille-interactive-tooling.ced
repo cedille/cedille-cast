@@ -1,0 +1,35 @@
+module cedille-interactive-tooling.
+
+data Nat : ★ =
+  | Z : Nat
+  | S : Nat ➔ Nat.
+
+add : Nat ➔ Nat ➔ Nat = λ m. λ n. μ add. n {
+  | Z ➔ m
+  | S n ➔ S (add n)
+}.
+
+_ : {λ x. (λ y. λ z. y (z y)) x (λ y. y) ≃ λ x. x x} = β.
+
+add-z2 : Π n : Nat. {add n Z ≃ n} =
+  λ n. β.
+
+add-s2 : Π m : Nat. Π n : Nat. {add m (S n) ≃ S (add m n)} =
+  λ m. λ n. β.
+
+add-z1 : Π n : Nat. {add Z n ≃ n} =
+  λ n. μ add-z1 . n {
+    | Z ➔ β
+    | S n ➔ (ρ (add-z1 n) @ x . { S x ≃ S n } - χ { S n ≃ S n } - β)
+  }.
+
+add-s1 : Π m : Nat. Π n : Nat. {add (S m) n ≃ S (add m n)} =
+  (λ m : Nat . λ n : Nat .
+     μ add-s1 . n @ (λ n : Nat . { add (S m) n ≃ S (add m n) }) {
+       | Z ➔ χ { add (S m) Z ≃ S (add m Z) } - β
+       | S n ➔ ρ (add-s2 (S m) (to/Nat -isType/add-s1 n))
+         @ x . { x ≃ S (add m (S n)) }
+        - ρ (add-s2 m (to/Nat -isType/add-s1 n)) @ x . { S (add (S m) n) ≃ S x }
+           - ρ (add-s1 n) @ x . { S x ≃ S (S (add m n)) }
+              - χ { S (S (add m (to/Nat n))) ≃ S (S (add m n)) } - β
+     }).
