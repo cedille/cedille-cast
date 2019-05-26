@@ -1,7 +1,7 @@
 module cedille-cast-06.
 
 {- Hello everyone, and welcome back to the Cedille cast. In this month's video I
--- am interupting the sequence on the generic derivation of induction for
+-- am interrupting the sequence on the generic derivation of induction for
 -- datatypes in Cedille, to announce the release of Cedille 1.1, which includes
 -- syntax for declaring inductive datatypes and defining functions over them
 -- using case analysis and recursion! This is no April Fool's joke: the syntax
@@ -50,7 +50,7 @@ add : Nat ➔ Nat ➔ Nat
 -- If I press capital E, and provide a directory, Cedille will elaborate all of
 -- the definitions so far to a a file with the same name but with extension
 -- .cdle. .cdle files are checked with a different tool: Cedille Core, a
--- mininmal implementation of Cedille's core theory in Haskell. As we can see,
+-- minimal implementation of Cedille's core theory in Haskell. As we can see,
 -- that tool tells us this file type checks!
 --
 -- Due to limitations in our Emacs front-end, these large files often can't be
@@ -58,7 +58,7 @@ add : Nat ➔ Nat ➔ Nat
 -- `M-x cedille-mode`, type check, and edit out the long wait
 --
 -- We can see the elaborated file is also valid Cedille, and scrolling towards
--- the botton can begin to see the translation of Nat, pred, and add. The
+-- the bottom can begin to see the translation of Nat, pred, and add. The
 -- definitions at the begining are from the generic derivation of induction,
 -- which we will be covering in later videos.
 --

@@ -13,7 +13,7 @@ module cedille-cast-03.
 -- Hello again and welcome to the Cedille Cast, a series of videos on writing
 -- programs and proofs in Cedille. In the previous two videos we saw how to
 -- derive induction for λ-encodings of data-types rather than adding them to the
--- theory as primitive. This was achived by adding three new typing constructs
+-- theory as primitive. This was achieved by adding three new typing constructs
 -- to the calculus of constructions: dependent intersection types, implicit
 -- products, and untyped equality.
 --
@@ -40,7 +40,7 @@ test-refl-η  ◂ {λ x. x ≃ λ x. λ y. x y} = β.
 -- not a λ term. So what gives? Well, you can consider β to be a special kind of
 -- type annotation for proving equality that gets erased to a λ-term. In the
 -- examples above, β erases to λ x. x. For those of you familiar with Leibniz
--- equality in the Calculus of Constructions, that should seem fairly intutive.
+-- equality in the Calculus of Constructions, that should seem fairly intuitive.
 -- However, I must mention that this is *not* the only term that β might erase
 -- to, just the one it erases to by default. The subject of what witnesses of an
 -- equality erase to will be covered in another video.
@@ -79,7 +79,7 @@ test-trans ◂ ∀ A: ★. ∀ B: ★. ∀ C: ★. ∀ a: A. ∀ b: B. ∀ c: C.
 test-sym1 ◂ ∀ A: ★. ∀ B: ★. ∀ a: A. ∀ b: B. {a ≃ b} ➔ {b ≃ a}
   = Λ A. Λ B. Λ a. Λ b. λ eq. ς eq.
 
--- It is inessential because any time you want to show a symmettric equality,
+-- It is inessential because any time you want to show a symmetric equality,
 -- you can just use ρ
 
 test-sym2 ◂ ∀ A: ★. ∀ B: ★. ∀ a: A. ∀ b: B. {a ≃ b} ➔ {b ≃ a}
@@ -215,7 +215,7 @@ rapp ◂ ∀ A: ★. ∀ B: ★. A ➔ (A ➔ B) ➔ B
 
 -- Even though we know morally that the difference between eliminating a cast
 -- and `rapp` is that the former is zero-cost -- that is, it's only applying an
--- identity function -- this is not apparent from the defintion. We want an
+-- identity function -- this is not apparent from the definition. We want an
 -- elimination principle that is *obviously* zero-cost. And we can get it!
 
 elimCast' ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➔ B

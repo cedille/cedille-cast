@@ -39,8 +39,8 @@ csucc ◂ cNat ➔ cNat
   own iterators *and* their own proofs of induction? Yes, we can -- by
   introducing the dependent intersection!
 
-  Well, before talking about depenent intersection, let's just talk about a
-  regular, non-depedent intersection type -- namely the idea that a single term
+  Well, before talking about dependent intersection, let's just talk about a
+  regular, non-dependent intersection type -- namely the idea that a single term
   can have two types. Let's start with a simple example -- the fact that zero
   can be both a Nat and a Bool!
 -}
@@ -103,7 +103,7 @@ izero ◂ iNat czero
 isucc ◂ {-Π-} ∀ m: cNat. iNat m ➔ iNat (csucc m)
   = Λ m. λ im. Λ P. λ base. λ step. step -m (im base step).
 
-{- Indeed, the reall Nat is the intersection of all cNats that are also proofs
+{- Indeed, the real Nat is the intersection of all cNats that are also proofs
    of their own induction!
 -}
 
@@ -122,7 +122,7 @@ succ ◂ Nat ➔ Nat = λ n. [ csucc n.1 , isucc -n.1 n.2 ] .
   thwarting convertibility of these two terms. How frustrating!
 
   Fortunately, we can address this with the next construct Cedille adds --
-  irrelevant producs, ∀. Earlier we said that you can think of this as being the
+  irrelevant products, ∀. Earlier we said that you can think of this as being the
   quantifier for types, but this is not the whole story -- now we can reveal
   that it's the quantifier for *all* erased entities, which includes terms as
   well! An erased term is used only for typing, but does not appear in the

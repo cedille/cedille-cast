@@ -13,23 +13,23 @@ today's video will be about a much more subtle use: using casts to generically
 derive equi-recursive types via Tarski's fixpoint theorem!
 
 First, a short primer on recursive types: you are probably already familiar with
-them at some intutive level, especially if you use languages like Haskell, ML,
+them at some intuitive level, especially if you use languages like Haskell, ML,
 or languages with dependent types. For an example, any natural number is
 *either* zero *or* the successor of another natural number; any list is either
 nil *or* the cons of some data with another list. Note the recursion inherent in
 the definition of these types. One way to model these and other such types is as
 the least fix-point of a functor whose parameter is a type representing the
-"recursive occurence" of the type you want to define. For example, natural
+"recursive occurrence" of the type you want to define. For example, natural
 numbers would be the least fix-point of
 -}
 
 NatF ◂ ★ ➔ ★ = λ R: ★. ∀ X: ★. X ➔ (R ➔ X ➔ X) ➔ X.
 
 {-
-Our functor, NatF, takes a parameter R representing the recursive occurence of
+Our functor, NatF, takes a parameter R representing the recursive occurrence of
 the data-type we are defining. In the successor case, we now not only have
 access to the previously computed value -- this X -- but also the number used to
-compute that value, or in otherwords the predecessor -- this R. This is known as
+compute that value, or in other words the predecessor -- this R. This is known as
 the Church-Scott or Parigot encoding, and represents numbers as their own
 recursors, rather than their own iterators as in the Church encoding.
 
@@ -166,7 +166,7 @@ castInFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(F ·(Fix ·F)) ·(Fi
 --    Noting again how, magically, our let-bound `f` is an identity function
 
 {-
-Fiinfnally, the other proof (which is fortunately much easier)
+Finally, the other proof (which is fortunately much easier)
 -}
 
 castOutFix ◂ ∀ F: ★ ➔ ★. Monotonic ·F ➾ Cast ·(Fix ·F) ·(F ·(Fix ·F))
