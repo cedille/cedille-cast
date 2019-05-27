@@ -17,7 +17,7 @@ For more information on Cedille, check out our [website](https://cedille.github.
   
 ## Screencasts ##
 
-- Deriving induction for \(\lambda\)-encoded datatypes
+- Deriving induction for lambda-encoded datatypes
   - for Church encoded naturals (parts [1](screencasts/cedille-cast-01.ced) and
     [2](screencasts/cedille-cast-02.ced))
   - generically for Mendler-syle encodings (parts [1](screencasts/cedille-cast-05.ced) and [2](screencasts/cedille-cast-07.ced))
