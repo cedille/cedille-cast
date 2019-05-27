@@ -2,11 +2,11 @@
 -- =============================================================================
 --
 -- Hello, and welcome back to the Cedille Cast. This video continues the
--- sequence on generically deriving induction for data that is λ-encoded in the
--- "Mendler style" in Cedille. The first video in the sequence introduced the
--- notions of F-algebras, Mendler-style F-algebras, and the fixpoints of
--- functors derived using them. It is recommended that you watch that first
--- video before continuing with this one.
+-- sequence on generically deriving induction for "Mendler-style" λ-encoded data
+-- in Cedille. The first video in the sequence introduced the notions of
+-- F-algebras, Mendler-style F-algebras, and the fixpoints of functors derived
+-- using them. It is recommended that you watch that video before continuing
+-- with this one.
 --
 -- In this video, we re-introduce our definition of a monotonic type scheme
 -- (which we first covered in the video on recursive types a la Tarski) which
@@ -42,10 +42,11 @@ import alg ·F.
 outM : FixM ➔ F ·FixM
 = λ d. d (Λ R. λ rec. λ ds. ●).
 
-{- Previously, we used that fact that our type scheme F was a functor to map the
--- recursive function `rec`, then take the `in` of the result. The approach we
--- will take here instead is more subtle, and requires first deriving and
--- induction principle for the datatype before we can even define `outM`.
+{- In our context buffer, we see ds : F ·R and rec : R ➔ F ·FixM. Previously, we
+-- used that fact that our type scheme F was a functor to map `rec`, then take
+-- the `in` of the result. The approach we will take here instead is more
+-- subtle, and requires first deriving and induction principle for the datatype
+-- before we can even define `outM`.
 --
 -- Intuitively, the type variable `R` in Mendler algebras will *always* hide the
 -- actual datatype itself (here, `FixM`). We need to be able to reveal this fact
@@ -68,24 +69,27 @@ PrfAlgM : Π X: ★. (X ➔ ★) ➔ (F ·X ➔ X) ➔ ★
 --    version of the datatype
 -- 4. As before, we quantify over a type R representing recursive occurrences of
 --    the datatype
--- 5. But now we equip the proof algebra with `c`, a cast from R to X (the datatype)
+-- 5. But now we equip the proof algebra with `c`, a cast from R to X (the
+--    datatype). Notice that this additional argument is *erased*, so that terms
+--    witnessing a proof algebra will align with those witnessing a regular
+--    Mendler-algebra.
 -- 6. Our function for recursive calls becomes `ih`, the inductive hypothesis
 --    proving P holds recursively for all of the subdata -- after casting it
 --    back to the appropriate type
 -- 7. rs, our unfolded data
--- 8. The result is a proof that P holds for the `in` of our argument. If we
---    our datatype were `Nat`, this would be like saying P holds of `suc m`. P
---    holds of the data /constructed/ from subdata rs.
+-- 8. The result is a proof that P holds for the `in` of our argument. For
+--    example, if our datatype was `Nat`, this would be like saying P holds of
+--    `suc m`. P holds of the data /constructed/ from subdata rs.
 --
 -- Following Cedille's usual recipe for deriving induction, we use this to
--- define what is means for some FixM to be inductive
+-- define what it means for some FixM to be inductive
 -}
 
 InductiveM : FixM ➔ ★
 = λ x: FixM. ∀ P: FixM ➔ ★. PrfAlgM ·FixM ·P inM ➔ P x.
 
-{- InductiveM says to prove a property about some particular, specified FixM,
--- you just need to give a proof algebra proving P (with constructors inM).
+{- InductiveM says to prove P for some particular, specified FixM, you just need
+-- to give a proof algebra proving P (with constructors inM).
 --
 -- Then, our /real/ datatype is formed from the intersection of FixM and proofs
 -- they are inductive.
@@ -97,6 +101,91 @@ FixIndM : ★ = ι x: FixM. InductiveM x.
 -- first we have to define an `in` function for this new type
 -}
 
-inIndM1 : F ·FixIndM ➔ FixM
-= λ ds. inM (elimCast -(mono ·FixIndM ·FixM [λ x. x.1 , β ]) ds).
+castFixIndM2FixM : Cast ·FixIndM ·FixM
+= intrCast (λ x. x.1) (λ _. β).
 
+{- First, it is very easy to define a cast from FixIndM to FixM. FixIndM is just
+-- the intersection of FixM and a proof it is inductive, and by erasure of
+-- intersection, x.1 is definitionally equal to x
+-}
+
+inIndM1 : F ·FixIndM ➔ FixM
+= λ ds. inM (elimCast -(mono castFixIndM2FixM) ds).
+
+_ : {inIndM1 ≃ inM} = β.
+
+{- Our first version of `in` for the inductive FixIndM uses the cast lifting
+-- `mono` to transform the cast from FixIndM to FixM to a cat from F ·FixIndM to
+-- F ·FixM. Then we may take the in of this to produce a FixM.
+--
+-- Notice that inIndM1 has the same erasure as inM
+-}
+
+inIndM2 : Π ds: F ·FixIndM. InductiveM (inIndM1 ds)
+= λ ds. Λ P. λ alg. alg ·FixIndM -castFixIndM2FixM (λ d. d.2 alg) ds.
+
+_ : {inIndM2 ≃ inM} = β.
+
+{- 1. `λ ds. Λ P. λ alg. alg -● ● ●`
+--    After taking our argument `ds` we must construct a proof that the
+--    FixM constructed from ds is inductive. We assume some property P, and a
+--    proof algebra over datatype FixM, property P, and initial algebra inM, and
+--    must show P holds of `inIndM1 ds`.
+--
+--    Our proof algebra will allow us to prove P holds of the `inM` of a casted
+--    `ds` -- but this is convertible with the expected type!
+--
+-- 2. `λ ds. Λ P. λ alg. alg ·FixIndM -castFixIndM2FixM (λ d. d.2 alg) ds`
+--    Having the algebra, we may choose how to instantiate the type `R` for
+--    recursive occurrences of the subdata of ds. We pick `FixIndM`. Our proof
+--    algebra is over the datatype FixM, so we must show how to cast FixIndM to
+--    FixM, which we have already. We must provide the algebra with an inductive
+--    hypothesis: given some subdata of type FixIndM, select the view of it as
+--    being an inductive FixM, which takes a proof algebra and returns a proof
+--    that P holds of it (viewed at type FixM). We have a proof algebra already,
+--    so give it that. Finally, the last argument is the unfolded data `ds` to run
+--    the algebra on.
+--
+-- First, notice the expected type and actual type. They are different -- but
+-- convertible. Second, notice again that inIndM again has the same erasure as
+-- inM. This allows us to construct the "true" folding-in function for FixIndM
+-}
+
+inIndM : F ·FixIndM ➔ FixIndM
+= λ ds. [ inIndM1 ds , inIndM2 ds ].
+
+{- Unfortunately, we must end this video on something of a cliffhanger. We are
+-- very close to being able to define the induction principle for FixIndM, but
+-- there is still a very important piece missing which we will cover in the next
+-- (and last) video in this sequence. Let's attempt the definition and see what
+-- goes wrong.
+-}
+
+inductionM : ∀ P: FixIndM ➔ ★. PrfAlgM ·FixIndM ·P inIndM ➔ Π d: FixIndM. P d
+= Λ P. λ alg. λ d. d.2 ·P ●.
+
+{- 1. `∀ P: FixIndM ➔ ★. PrfAlgM ·FixIndM ·P inIndM ➔ Π d: FixIndM. P d`
+--    We now take a property P over FixIndM, and a proof algebra with over
+--    *data* FixIndM (instead of FixM as we had done before), P, and constructor
+--    `inIndM`, and must show for all x, P x holds.
+-- 2. `Λ P. λ alg. λ d. ●`
+--    Given a P, proof algebra, and data `d`, we to prove P holds of `d`. The
+--    only way we know how to prove things about d is by the view that `d` is an
+--    inductive FixM
+-- 3. `Λ P. λ alg. λ d. d.2 ·P ●`
+--    Alas! `d.2` allows us to prove properties of FixM, but P is a property of
+--    FixIndM. d.2 also takes proof algebras over FixM, but what we have is a
+--    proof algebra over FixIndM.
+--
+-- What we need, and what we'll show next time, is a way to convert
+-- - any property P over FixIndM to an equivalent property of FixM
+-- - any proof algebra over FixIndM to an equivalent algebra for FixM.
+--
+-- In the next video, we'll introduce the final bit of kit need to make that
+-- conversion by augmenting our `Cast` type with a way to *remember* that some
+-- property `P` holds of some data *that has been casted* from another type.
+-- That is to say, that P holds of some FixIndM that has been casted from a
+-- FixM.
+--
+-- Thanks for watching, and see you in the next video!
+-}
