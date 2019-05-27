@@ -1,0 +1,102 @@
+{- # Generic Derivation of Induction for Mendler-style Encodings, Pt. 2
+-- =============================================================================
+--
+-- Hello, and welcome back to the Cedille Cast. This video continues the
+-- sequence on generically deriving induction for data that is λ-encoded in the
+-- "Mendler style" in Cedille. The first video in the sequence introduced the
+-- notions of F-algebras, Mendler-style F-algebras, and the fixpoints of
+-- functors derived using them. It is recommended that you watch that first
+-- video before continuing with this one.
+--
+-- In this video, we re-introduce our definition of a monotonic type scheme
+-- (which we first covered in the video on recursive types a la Tarski) which
+-- generalizes the notion of a functor, show how this can be used to define the
+-- generic set of constructors and destructors for datatypes, and make some
+-- progress on deriving the induction principle.
+-}
+
+import cast.
+
+module cedille-cast-07 (F: ★ ➔ ★) (mono: Monotonic ·F).
+
+{- Recall that `Monotonic ·F` means that for any two types A and B, if there is
+-- a cast between A and B, there's a cast between F A and F B
+--
+-- `Cast ·A ·B ➔ Cast ·(F ·A) ·(F ·B)`
+--
+-- this is very similar to the definition of a functor, just that we restrict
+-- `fmap` to casts (i.e., to just identity functions)
+--
+-- `(A ➔ B) ➔ F ·A ➔ F ·B`
+--
+-- Previously, we had defined `in` for Mendler-style encodings, which hadn't
+-- required that our type scheme be a functor, and out, which did. Let's review
+-- some of these definitions.
+-}
+
+import alg ·F.
+
+{- Now, let us consider what goes wrong when we try to define `outM`
+-}
+
+outM : FixM ➔ F ·FixM
+= λ d. d (Λ R. λ rec. λ ds. ●).
+
+{- Previously, we used that fact that our type scheme F was a functor to map the
+-- recursive function `rec`, then take the `in` of the result. The approach we
+-- will take here instead is more subtle, and requires first deriving and
+-- induction principle for the datatype before we can even define `outM`.
+--
+-- Intuitively, the type variable `R` in Mendler algebras will *always* hide the
+-- actual datatype itself (here, `FixM`). We need to be able to reveal this fact
+-- in the form of a Cast from R to FixM.
+--
+-- Let us now define a Mendler-style proof algebra, which is similar to the type
+-- "inductive Nat" from the first two videos on this channel.
+-}
+
+PrfAlgM : Π X: ★. (X ➔ ★) ➔ (F ·X ➔ X) ➔ ★
+= λ X: ★. λ P: X ➔ ★. λ in: F ·X ➔ X.
+  ∀ R: ★. ∀ c: Cast ·R ·X. Π ih: (Π r: R. P (elimCast -c r)).
+  Π rs: F ·R. P (in (elimCast -(mono c) rs)).
+
+{- 1. The carrier `X` is a stand-in for the datatype, FixM, and the inductive
+--    variant `FixIndM` we will define in terms of PrfAlg itself
+-- 2. The property P we wish to prove
+-- 3. The initial algebra `in`, or folding function. We have defined already the
+--    version over `FixM`, but we will also need to use it for the inductive
+--    version of the datatype
+-- 4. As before, we quantify over a type R representing recursive occurrences of
+--    the datatype
+-- 5. But now we equip the proof algebra with `c`, a cast from R to X (the datatype)
+-- 6. Our function for recursive calls becomes `ih`, the inductive hypothesis
+--    proving P holds recursively for all of the subdata -- after casting it
+--    back to the appropriate type
+-- 7. rs, our unfolded data
+-- 8. The result is a proof that P holds for the `in` of our argument. If we
+--    our datatype were `Nat`, this would be like saying P holds of `suc m`. P
+--    holds of the data /constructed/ from subdata rs.
+--
+-- Following Cedille's usual recipe for deriving induction, we use this to
+-- define what is means for some FixM to be inductive
+-}
+
+InductiveM : FixM ➔ ★
+= λ x: FixM. ∀ P: FixM ➔ ★. PrfAlgM ·FixM ·P inM ➔ P x.
+
+{- InductiveM says to prove a property about some particular, specified FixM,
+-- you just need to give a proof algebra proving P (with constructors inM).
+--
+-- Then, our /real/ datatype is formed from the intersection of FixM and proofs
+-- they are inductive.
+-}
+
+FixIndM : ★ = ι x: FixM. InductiveM x.
+
+{- FixIndM is the type we will actually be defining an out function for. But,
+-- first we have to define an `in` function for this new type
+-}
+
+inIndM1 : F ·FixIndM ➔ FixM
+= λ ds. inM (elimCast -(mono ·FixIndM ·FixM [λ x. x.1 , β ]) ds).
+
