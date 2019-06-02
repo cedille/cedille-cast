@@ -9,10 +9,11 @@
 -- with this one.
 --
 -- In this video, we re-introduce our definition of a monotonic type scheme
--- (which we first covered in the video on recursive types a la Tarski) which
--- generalizes the notion of a functor, show how this can be used to define the
--- generic set of constructors and destructors for datatypes, and make some
--- progress on deriving the induction principle.
+-- (which we first covered in the video on deriving recursive types a la Tarski)
+-- which generalizes the notion of a functor, show how this can be used to
+-- define the generic set of constructors for datatypes that will support an
+-- induction principle, and make some progress on deriving this induction
+-- principle.
 -}
 
 import cast.
@@ -36,17 +37,27 @@ module cedille-cast-07 (F: ★ ➔ ★) (mono: Monotonic ·F).
 
 import alg ·F.
 
-{- Now, let us consider what goes wrong when we try to define `outM`
+{- We saw before:
+-- 1. `Alg`, the usual definition of an F-algebra
+-- 2. `Fix`, the carrier of an initial F-algebra
+-- 3. `fold`, the catamorphism
+-- 4. `AlgM`, the definition of a Mendler-style F-algebra
+-- 5. `FixM`, the carrier of an initial Mendler style F-algebra
+-- 6. `foldM`, the Mendler-style catamorphism
+-- 7. `inM`, the initial F-algebra, or the generic set of constructors of the
+--    datatype
+--
+-- Now, let us consider what goes wrong when we try to define `outM`
 -}
 
 outM : FixM ➔ F ·FixM
 = λ d. d (Λ R. λ rec. λ ds. ●).
 
 {- In our context buffer, we see ds : F ·R and rec : R ➔ F ·FixM. Previously, we
--- used that fact that our type scheme F was a functor to map `rec`, then take
--- the `in` of the result. The approach we will take here instead is more
--- subtle, and requires first deriving and induction principle for the datatype
--- before we can even define `outM`.
+-- used the fact that our type scheme F was a functor to map `rec` over `ds`,
+-- then take the `in` of the result. The approach we will take here instead is
+-- more subtle, and requires first deriving and induction principle for the
+-- datatype before we can even define `outM`.
 --
 -- Intuitively, the type variable `R` in Mendler algebras will *always* hide the
 -- actual datatype itself (here, `FixM`). We need to be able to reveal this fact
@@ -61,8 +72,8 @@ PrfAlgM : Π X: ★. (X ➔ ★) ➔ (F ·X ➔ X) ➔ ★
   ∀ R: ★. ∀ c: Cast ·R ·X. Π ih: (Π r: R. P (elimCast -c r)).
   Π rs: F ·R. P (in (elimCast -(mono c) rs)).
 
-{- 1. The carrier `X` is a stand-in for the datatype, FixM, and the inductive
---    variant `FixIndM` we will define in terms of PrfAlg itself
+{- 1. The carrier `X` is a stand-in for two types: the datatype FixM, and the
+--    inductive variant `FixIndM` we will define in terms of PrfAlg itself
 -- 2. The property P we wish to prove
 -- 3. The initial algebra `in`, or folding function. We have defined already the
 --    version over `FixM`, but we will also need to use it for the inductive
@@ -77,9 +88,10 @@ PrfAlgM : Π X: ★. (X ➔ ★) ➔ (F ·X ➔ X) ➔ ★
 --    proving P holds recursively for all of the subdata -- after casting it
 --    back to the appropriate type
 -- 7. rs, our unfolded data
--- 8. The result is a proof that P holds for the `in` of our argument. For
---    example, if our datatype was `Nat`, this would be like saying P holds of
---    `suc m`. P holds of the data /constructed/ from subdata rs.
+-- 8. The proof algebra returns a proof that P holds for the `in` of our
+--    argument. For example, if our datatype was `Nat`, this would be
+--    like saying P holds of `suc m`. P holds of the data /constructed/ from
+--    subdata rs.
 --
 -- Following Cedille's usual recipe for deriving induction, we use this to
 -- define what it means for some FixM to be inductive
@@ -115,7 +127,7 @@ inIndM1 : F ·FixIndM ➔ FixM
 _ : {inIndM1 ≃ inM} = β.
 
 {- Our first version of `in` for the inductive FixIndM uses the cast lifting
--- `mono` to transform the cast from FixIndM to FixM to a cat from F ·FixIndM to
+-- `mono` to transform the cast from FixIndM to FixM to a cast from F ·FixIndM to
 -- F ·FixM. Then we may take the in of this to produce a FixM.
 --
 -- Notice that inIndM1 has the same erasure as inM
@@ -169,7 +181,7 @@ inductionM : ∀ P: FixIndM ➔ ★. PrfAlgM ·FixIndM ·P inIndM ➔ Π d: FixI
 --    *data* FixIndM (instead of FixM as we had done before), P, and constructor
 --    `inIndM`, and must show for all x, P x holds.
 -- 2. `Λ P. λ alg. λ d. ●`
---    Given a P, proof algebra, and data `d`, we to prove P holds of `d`. The
+--    Given a P, proof algebra, and data `d`, we to wish prove P holds of `d`. The
 --    only way we know how to prove things about d is by the view that `d` is an
 --    inductive FixM
 -- 3. `Λ P. λ alg. λ d. d.2 ·P ●`
