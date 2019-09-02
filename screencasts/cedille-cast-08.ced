@@ -1,0 +1,211 @@
+{- # Generic Derivation of Induction for Mendler-style Encodings, Pt. 3
+-- =============================================================================
+-- Hello, and welcome back to the Cedille Cast. This video finishes the sequence
+-- on generically deriving induction for "Mendler-style" λ-encoded data in
+-- Cedille. The first video of the sequence introduced the notions of
+-- F-algebras, Mendler-style F-algebras, and the fixpoints of functors derived
+-- of them. The second video utilized a Cedille-idiom `Monotonic` -- a predicate
+-- of positivity for type schemes -- and gave the definition of a "P-proof
+-- F-algebra" for dependent eliminations and the generic constructor for
+-- datatypes that support an induction principle. It is recommended that you
+-- watch those two videos before watching this one.
+--
+-- In this video, we finish our attempt to define the induction principle by
+-- introducing an "augmented" Cast type -- one which allows us to show that if
+-- we have a proof that some property holds for data which we have casted, we
+-- can extract a proof by reformulating the property over the type
+-- from which we casted.
+-}
+
+import cast.
+
+module cedille-cast-08 (F: ★ ➔ ★) {mono: Monotonic ·F}.
+
+
+
+import alg ·F.
+{- in navigation mode, `j` to jump to a module, after selecting the import -}
+import prfalg ·F -mono.
+
+{- ## Recap
+-- -----------------------------------------------------------------------------
+-- First, let us recall some definitions from the previous video. We saw before
+-- 1. `PrfAlgM`, the type of "inductive reasoning"
+--    Parameterized by a carrier `X` (so that it may be used with both FixM
+--    and FixIndM) and algebra `in : F ·X ➔ X` (so that it may be used with both
+--    inFixM and inFixIndM), and property P, given a type R which is castable
+--    to the datatype X, and an inductive hypothesis `ih`, from some
+--    case-analyzed data xs of type F ·R, return a proof that P holds for the
+--    data constructed by `in xs` (after casting all the R subdata to X).
+-- 2. `InductiveM`, a predicate indicating that some x of type FixM supports an
+--    induction principle (given some inductive reasoning for P, return a proof
+--    that P holds for this particular x)
+-- 3. `IndM`, the type of FixM data which also themselves prove they support
+--    an induction principle.
+-- 4. `toFixM`, a cast from inductive data to regular data
+-- 5. `inIndM`, the constructor for inductive data.
+-}
+
+{- Next, we recall where it is we got stuck proving the induction principle
+-}
+
+inductionMFail : ∀ P: IndM ➔ ★. PrfAlgM ·IndM ·P inIndM ➔ Π d: IndM. P d
+= Λ P. λ alg. λ d. d.2 ·P ●.
+
+{- ## Lift and IhPlus
+-- -----------------------------------------------------------------------------
+-- The proof principle of d.2 gives us the ability to prove a property for d.1
+-- at type FixM, but P is a property of d at type FixIndM. We need a way to
+-- transform property P into some P' of kind FixM ➔ ★ such that P' d.1 gives us
+-- P d
+-}
+
+import sigma.
+
+Lift : (IndM ➔ ★) ➔ FixM ➔ ★
+= λ P: IndM ➔ ★. λ x: FixM.
+  Sigma ·IndM ·(λ y: IndM. Sigma ·{y ≃ x} ·(λ eq: {y ≃ x}. P (φ eq - y {x}))).
+
+{- For any property P: IndM ➔ ★, Lift ·P x : ★ is a triple consisting of
+-- 1. some data y of type IndM
+-- 2. a proof that y ≃ x
+-- 3. a proof of P x, where we cast x to the type of y
+--
+-- Now, let's see how we can use this to augment our inductive hypothesis
+-}
+
+IhPlus : Π R: ★. Cast ·R ·FixM ➔ (IndM ➔ ★) ➔ ★
+= λ R: ★. λ c: Cast ·R ·FixM. λ P: IndM ➔ ★.
+  Π r: R. Lift ·P (elimCast -c r).
+
+{- For any type R for which there is a cast from it to FixM, and for any
+-- property P, the type of augmented inductive hypotheses is one which returns,
+-- from some r : R, a proof Lift ·P r (where we cast r)
+--
+-- Intuitively, what we will want to be doing is making an inductive hypothesis
+-- where each time we are returning this triple: the first component we will
+-- construct by *rebuilding* our subdata with the inductive constructor inIndM;
+-- the second component will then amount to a proof of an instance of the
+-- reflection law (that iteratively rebuilding data with constructors produces
+-- the same data); the third component is the part corresponding to the proof
+-- returned by the inductive hypothesis.
+--
+-- We will want to define two utilities for IhPlus: a cast-extraction and a
+-- proof-extraction. The cast extraction makes use of the fact that the second
+-- component of our triple tells us that the first is equal to the subdata we
+-- were given. That is, we have, for all r: R and c : Cast ·R ·FixM
+-- 1. proj1 (ih r) : IndM
+-- 2. proj1 (proj2 (ih r)) : proj1 (ih r) ≃ r
+-- Allowing us to form a cast from R to IndM
+-}
+
+castIhPlus
+: ∀ R: ★. ∀ c: Cast ·R ·FixM. ∀ P: IndM ➔ ★. IhPlus ·R c ·P ➔ Cast ·R ·IndM
+= Λ R. Λ c. Λ P. λ ih.
+  intrCast (λ r. proj1 (ih r)) (λ r. proj1 (proj2 (ih r))).
+
+{- Proof extraction just gives us the induction hypothesis we were originally
+-- interested in from the augmented inductive hypothesis: for all r: R, P r
+-- after casting r (via castIhPlus) to IndM
+-}
+
+prfIhPlus
+: ∀ R: ★. ∀ c: Cast ·R ·FixM. ∀ P: IndM ➔ ★. Π ih: IhPlus ·R c ·P.
+  Π r: R. P (elimCast -(castIhPlus -c ih) r)
+= Λ R. Λ c. Λ P. λ ih. λ r. (proj2 (proj2 (ih r))).
+
+{- ## Proof of induction and definition of outM
+-- -----------------------------------------------------------------------------
+-- Now we need to convert P-proof F-algebras to Lift ·P-proof F-algebras. This
+-- is where we are implicitly proving the reflection law
+-}
+
+convAlg : ∀ P: IndM ➔ ★. PrfAlgM ·IndM ·P inIndM ➔ PrfAlgM ·FixM ·(Lift ·P) inM
+= Λ P. λ alg. Λ R. Λ c. λ ih. λ xs.
+  [c'  = castIhPlus -c ih]
+- [xs' = elimCast -(mono c') xs]
+- [ih' = prfIhPlus -c ih]
+- mksigma (inIndM xs') (mksigma β (alg -c' (prfIhPlus -c ih) xs)).
+
+{- 0. we have c : Cast ·R ·FixM, ih : IhPlus ·R c ·P, and xs: F ·R
+-- 1. we form a new cast c' : Cast ·R ·IndM
+-- 2. we use this cast, xs, and monotonicity of F to produce xs' : F ·IndM,
+--    noting that xs ≃ xs' definitionally
+-- 3. we extract the inductive hypothesis we really care about,
+--    ih' : Π r: R. P r (after casting r)
+-- 4. We form our triple, with the first component inIndM xs' : IndM, the second
+--    component a proof that inIndM xs ≃ inM xs' (by definition, as inIndM ≃
+--    inM), and the third component being a proof of P (inIndM xs')
+-}
+
+inductionM : ∀ P: IndM ➔ ★. PrfAlgM ·IndM ·P inIndM ➔ Π x: IndM. P x
+= Λ P. λ alg. λ x. proj2 (proj2 (x.2 (convAlg alg))).
+
+{- After all that, the induction principle is straightforward to prove: for some
+-- inductive data x : FixM, invoke the proof principle (over itself at type
+-- FixM) on the converted algebra, and extract the proof from the third
+-- component of the resulting tuple.
+--
+-- Finally, we are able to define `outM`, the destructor for data, by invoking
+-- the induction principle
+-}
+
+outM : IndM ➔ F ·IndM
+= inductionM ·(λ _: IndM. F ·IndM) (Λ R. Λ c. λ _. λ xs. elimCast -(mono c) xs).
+
+{-
+-- This concludes the video. Thanks for watching, and see you in the next one!
+--
+-- ## Bonus content
+-- -----------------------------------------------------------------------------
+-- So, those of you following along with the repo and who know about the theory
+-- of inductive datatypes may have observed a minor defect in this
+-- derivation, as well as some missing proofs one is expected to show if we wish to
+-- /really/ claim that what we have are inductive datatypes.
+--
+-- The minor defect is that we do not have here that inductionM ≃ foldM /by
+-- definition/
+-}
+
+_ : {inductionM ≃ foldM} = β.
+
+{- We do have that these two functions are extensionally equal for all regular
+-- algebras for which a parametricity condition holds (courtesy of Larry Diehl):
+-}
+
+AlgParamM : Π X: ★. AlgM ·X ➔ ★
+= λ X: ★. λ alg: AlgM ·X.
+  ∀ R: ★. Π f: R ➔ X. Π g: R ➔ X. (Π r: R. {f r ≃ g r}) ➔
+  Π xs: F ·R. {alg f xs ≃ alg g xs}.
+
+toPrfAlgM : ∀ X: ★. AlgM ·X ➔ PrfAlgM ·IndM ·(λ _: IndM. X) inIndM
+= Λ X. λ alg. Λ R. Λ c. alg ·R.
+
+indFoldEq
+: ∀ X: ★. Π alg: AlgM ·X. AlgParamM ·X alg ➾
+  Π x: IndM. {inductionM (toPrfAlgM alg) x ≃ fold alg x}
+= Λ X. λ alg. Λ param.
+  inductionM ·(λ x: IndM. {inductionM (toPrfAlgM alg) x ≃ fold alg x})
+   (Λ R. Λ c. λ ih. λ xs.
+    χ { alg (inductionM alg) xs ≃ alg (λ d . d alg) xs }
+  - [f = λ x: R. inductionM (toPrfAlgM alg) (elimCast -c x)]
+  - [g = λ x: R. foldM alg (elimCast -c x).1]
+  - ρ (param f g (λ x. ρ (ih x) - β) xs)
+  - β).
+
+{- This above proof is actually an instance of a more general initiality proof
+-- that can be shown (with the same restriction that the algebra is parametric).
+--
+-- There are also other encodings of FixM for which the catamorphism /will/ be
+-- definitionally equal to the induction principle. But, that's a subject for
+-- other videos!
+--
+-- The lacuna are the proofs of Lambek's lemmas that in and out are mutual
+-- inverses, which we give below:
+-}
+
+lambek1 : Π xs: F ·IndM. {outM (inM xs) ≃ xs} = λ xs. β.
+
+lambek2 : Π x: IndM. {inM (outM x) ≃ x}
+= inductionM ·(λ x: IndM. {inM (outM x) ≃ x})
+   (Λ R. Λ c. λ _. λ _. β).
