@@ -10,11 +10,12 @@
 -- datatypes that support an induction principle. It is recommended that you
 -- watch those two videos before watching this one.
 --
--- In this video, we finish our attempt to define the induction principle by
--- introducing an "augmented" Cast type -- one which allows us to show that if
--- we have a proof that some property holds for data which we have casted, we
--- can extract a proof by reformulating the property over the type
--- from which we casted.
+-- In this video, we finish our attempt to define the induction principle and
+-- generic destructor by introducing a type of "augmented" inductive hypothesis
+-- -- we will take our non-inductive "FixM", rebuild it with the generic
+-- constructor for inductive data, show that the rebuilt data is equal to the
+-- data we started with, and show that the property we wish to prove holds for
+-- this rebuilt data.
 -}
 
 import cast.
@@ -32,9 +33,9 @@ import prfalg ·F -mono.
 -- First, let us recall some definitions from the previous video. We saw before
 -- 1. `PrfAlgM`, the type of "inductive reasoning"
 --    Parameterized by a carrier `X` (so that it may be used with both FixM
---    and FixIndM) and algebra `in : F ·X ➔ X` (so that it may be used with both
---    inFixM and inFixIndM), and property P, given a type R which is castable
---    to the datatype X, and an inductive hypothesis `ih`, from some
+--    and FixIndM), property P of kind X ➔ ★, and algebra `in : F ·X ➔ X` (so
+--    that it may be used with both inFixM and inFixIndM), given a type R which
+--    is castable to the datatype X, and an inductive hypothesis `ih`, from some
 --    case-analyzed data xs of type F ·R, return a proof that P holds for the
 --    data constructed by `in xs` (after casting all the R subdata to X).
 -- 2. `InductiveM`, a predicate indicating that some x of type FixM supports an
