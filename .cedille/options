@@ -19,3 +19,5 @@ show-qualified-vars
 
 erase-types
   = true.
+
+datatype-encoding = "lib/encodings/mendler.ced" .

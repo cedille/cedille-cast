@@ -1,0 +1,173 @@
+-- -*- eval: (flyspell-mode); eval: (auto-fill-mode); -*-
+{- # Failure of Normalization in Impredicative Type Theory with Proof-Irrelevant
+--   Propositional Equality
+-- =============================================================================
+--
+-- Hello, and welcome back to the Cedille Cast. In this video, we expore a
+-- very recent result by Abel and Coquand concerning the combination of
+-- impredicativity and a strong form of proof-irrelevance for propositional
+-- equality. Specifically, this combination of features, which exists in the
+-- Lean proof assistant and also in Cedille, results in a failure of
+-- strong normalization of the theory, considered to be a highly
+-- desirable property. However, this result does not impinge upon logical
+-- consistency.
+--
+-- This video will explain each of the terms
+-- "impredicativity", "proof-irrelevance", and "strong normalization", and
+-- demonstrate in Cedille a similar derivation as given by Abel and Coquand. A
+-- link to their paper is given in the video description, and in Cedille code
+-- associated with this video.
+--
+-}
+
+module cedille-cast-09.
+
+{- Impredicativity
+-- -----------------------------------------------------------------------------
+-- If you have seen previous Cedille casts, you have seen the use of
+-- impredicativity. Generally speaking, a definition of some object is said to
+-- be impredicative if it involves quantification over some collection which
+-- could contain that object. Unrestricted, such quantification can lead to
+-- logical inconsistency. The classic example of this was discovered in the
+-- early 20th century in Russel's paradox of forming a set containing all sets
+-- which do not contain themselves.
+--
+-- The standard approach to ruling out inconsistency from impredicativity... is
+-- to forbid impredicativity! Often by constructing an infinite "universe
+-- hierarchy", in which definitions living at level 1 may quantify over all
+-- possible definitions at level 0, and so on. Alternatively, type theories like
+-- System F, or the Calculus of Constructions, seemingly tame impredicativity by
+-- virtue of parametricity -- that is, the requirement that polymorphic
+-- definitions map related inputs to related outputs.
+--
+-- In the derivation of Abel and Coquand, impredicativity is used in order to
+-- type "self-application". Let's take a look at two simple examples of this,
+-- typeable in System F. We will come back to the particular instance of this
+-- used in the paper a little later in the video.
+-}
+
+id : ∀ X: ★. X ➔ X
+= Λ X. λ x. x.
+
+idId : ∀ X: ★. X ➔ X = id id.
+
+-- In the "meta-variables" buffer (`m`), the type argument `X` of the
+-- application `id id` is instantiated to the very type of id itself. But, no
+-- amount of self-application of the identity function will enable us to define
+-- a looping term.
+--
+-- Here is the second example, which brings us right upon the precipice.
+
+ω : (∀ X: ★. X ➔ X) ➔ ∀ X: ★. X ➔ X
+= λ x. x x.
+
+-- If we could somehow type `ω ω`, then we would have the looping
+-- term known as capital Ω. But... little ω cannot have the type ∀ X: ★. X ➔ X,
+-- because we know by parametricity (and the fact that System F is a sound
+-- logic) that the only term with this type is identity.
+--
+-- We now turn to proof irrelevance.
+
+
+{- Proof-irrelevance
+-- -----------------------------------------------------------------------------
+--
+-- There are two different, but closely related, notions of proof irrelevance.
+-- The first, and perhaps most commonly known, is the property of any two proofs
+-- of some proposition being equal to each other. A trivial example of this is
+-- the proposition `True`, the trivially true proposition.
+--
+-- For those following along at home, consult the Cedille cast repo to see what
+-- your options file should look like, if you which to have support for
+-- datatype declarations.
+-}
+
+data True : ★ = triv : True .
+
+uniqueTrue : Π t: True. {t ≃ triv}
+= λ t. μ' t { triv ➔ β }.
+
+-- Propositions that are proof-irrelevant in this sense are often seperated from
+-- the rest of the type hierarchy by having a specially designated sort, usually
+-- called `Prop`. This is not the case in Cedille. And actually, this notion of
+-- proof irrelevance is not the most comfortable one for Cedille, either. As we
+-- have seen in previous videos, Cedille supports implicit quantification over
+-- terms and types. Implicit is another way of saying "compuationally
+-- irrelevant", so here we interpret proof-irrelevant as meaning that one need
+-- not compute anything in order to make use of the proof.
+--
+-- Now, the type True is even more trivially proof-irrelevant in this sense.
+-- Consider:
+
+trueIrrel : True ➾ True = Λ x. triv.
+
+-- Abel and Coquand use a propositional equality type which has associated with
+-- it a computation law making it proof-irrelevant in this second sense:
+-- functions defined over such proofs need not even pattern match, need not even
+-- do the most trivial form of computation, over such proofs. They use
+-- propositional equality between types to define type coercions enabling
+-- self-application of ω above. In Cedille, we do not have a way of expressing
+-- propositional equality of types. But, we /can/ express the notion of a type
+-- coercion, and it turns out that type coercions are, indeed, proof-irrelevant.
+
+import cast.
+
+-- Recall that casts are defined as the dependent intersection of functions f :
+-- A ➔ B together with proofs that f is equal to the identity function. Let us
+-- now show that having an /erased/ cast is just as good as having one unerased.
+
+castIrrel : ∀ A: ★. ∀ B: ★. Cast ·A ·B ➾ Cast ·A ·B
+= Λ A. Λ B. Λ c. [ λ x. elimCast -c x , β ] .
+
+-- In analogy to the Abel and Coquand paper, `castIrrel` shows that one does not
+-- need to inspect, or compute with, an assumed cast at all. (Recall that the Λ
+-- means erased abstraction, and the hyphen means application to an erased
+-- argument).
+--
+
+{- Omega and strong normalization
+-- -----------------------------------------------------------------------------
+--
+-- With the long-winded preliminaries behind us, the derivation itself is quite
+-- short. Define `Bot` ("Bottom", or "False") to be the type of proofs that
+-- prove everything is true. (So, no such proof can exist in a sound logic).
+-}
+
+Bot ◂ ★ = ∀ X: ★. X.
+
+-- Define "Not ·A" to be the type that a proof of A implies Bot
+
+Not ◂ ★ ➔ ★ = λ A: ★. A ➔ Bot.
+
+-- Define "Top" to be the type "Not ·Bot"
+
+Top ◂ ★ = Not ·Bot.
+
+-- Now comes the first tricky part. Let us proof the fact that it is not the
+-- case that for any two types A and B, there exists a cast from A to B
+
+omega : Not ·(∀ A: ★. ∀ B: ★. Cast ·A ·B)
+= λ c. Λ X. elimCast -(c ·Top ·X) (λ x. x ·Top x) .
+
+-- 1. we are given the erased proof c
+-- 2. and some arbitrary type X we must show
+-- 3. we will coerce a term of type Top to X
+-- 4. the Top term is the familiar λ x. x x, but now the bound variable has its
+--    type argument instantiated to Top.
+-- 5. observe that the cast argument `c` occurs nowhere in the erasure of `omega`.
+
+-- Finally, we may type capital Omega under and inconsistent context in which we
+-- have first assumed the existence of a cast between any two types.
+
+Omega : Not ·(∀ A: ★. ∀ B: ★. Cast ·A ·B)
+= λ c. omega c ·Top (omega c) .
+
+-- Strong normalization of a type theory is the property that, for every
+-- typeable term, all possible ways you could "run" that term will eventually
+-- produce a value. Languages based on dependent type theories often rely on
+-- the underling theory to have this property, since type-checking may require
+-- determining where two terms are equal. In the absence of strong
+-- normalization, type checking under these circumstances becomes formally
+-- undecidable. We demonstrate this directly in Cedille.
+
+-- hangCedille : {Omega ≃ id} = β.
