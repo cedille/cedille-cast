@@ -18,6 +18,7 @@
 -- link to their paper is given in the video description, and in Cedille code
 -- associated with this video.
 --
+-- Paper: https://arxiv.org/abs/1911.08174
 -}
 
 module cedille-cast-09.
