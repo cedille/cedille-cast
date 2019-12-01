@@ -30,3 +30,4 @@ For more information on Cedille, check out our [website](https://cedille.github.
   - [Inductive datatypes in version 1.1.0](screencasts/cedille-cast-06.ced)
   - [Interactive theorem proving in the beta-reduction
     buffer](screencasts/cedille-interactive-tooling.ced)
+- [Impredicativity and proof irrelevance](screencasts/cedille-cast-09.ced)
