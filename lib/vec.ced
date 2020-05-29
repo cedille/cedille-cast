@@ -1,0 +1,54 @@
+module lib/list .
+
+import top .
+
+import nat.
+
+VecC : ★ ➔ Nat ➔ ★
+= λ A: ★. λ n: Nat. ∀ X: Nat ➔ ★. X zero ➔ (∀ m: Nat. A ➔ X m ➔ X (succ m)) ➔ X n .
+
+vnilC : ∀ A: ★. VecC ·A zero
+= Λ A. Λ X. λ n. λ c. n .
+
+vconsC : ∀ A: ★. ∀ n: Nat. A ➔ VecC ·A n ➔ VecC ·A (succ n)
+= Λ A. Λ n. λ hd. λ tl. Λ X. λ vn. λ vc. vc -n hd (tl vn vc) .
+
+VecI : Π A: ★. Π n: Nat. VecC ·A n ➔ ★
+= λ A: ★. λ n: Nat. λ xs: VecC ·A n.
+  ∀ X: Π n: Nat. VecC ·A n ➔ ★.
+  X zero (vnilC ·A) ➔ (∀ n: Nat. ∀ tl: VecC ·A n. Π hd: A. X n tl ➔ X (succ n) (vconsC -n hd tl)) ➔
+  X n xs .
+
+Vec : ★ ➔ Nat ➔ ★ = λ A: ★. λ n: Nat. ι xs: VecC ·A n. VecI ·A n xs .
+
+vnil : ∀ A: ★. Vec ·A zero
+= Λ A. [ vnilC ·A , Λ X. λ n. λ c. n ] .
+
+vcons : ∀ A: ★. ∀ n: Nat. A ➔ Vec ·A n ➔ Vec ·A (succ n)
+= Λ A. Λ n. λ hd. λ tl.
+  [ vconsC -n hd tl.1
+  , Λ X. λ vn. λ vc. vc -n -tl.1 hd (tl.2 vn vc) ] .
+
+reflectVec : ∀ A: ★. ∀ n: Nat. VecC ·A n ➔ Vec ·A n
+= Λ A. Λ n. λ xs. xs (vnil ·A) (vcons ·A) .
+
+reflectionVec : ∀ A: ★. ∀ n: Nat. Π xs: Vec ·A n. { xs ≃ reflectVec xs.1 }
+= Λ A. Λ n. λ xs.
+  xs.2 ·(λ i: Nat. λ x: VecC ·A i. { x ≃ reflectVec x.1 })
+    β (Λ tl. Λ n. λ hd. λ ih. ρ+ ς ih - β) .
+
+indVec
+: ∀ A: ★. ∀ X: Π n: Nat. Vec ·A n ➔ ★.
+  X zero (vnil ·A) ➔ (∀ n: Nat. ∀ tl: Vec ·A n. Π hd: A. X n tl ➔ X (succ n) (vcons -n hd tl)) ➔
+  ∀ n: Nat. Π xs: Vec ·A n. X n xs
+= Λ A. Λ X. λ vn. λ vc. Λ n. λ xs.
+  ρ (reflectionVec -n xs)
+- xs.2 ·(λ i: Nat. λ x: VecC ·A i. X i (reflectVec -i x))
+    vn (Λ n. Λ tl. λ hd. λ ih. vc -n -(reflectVec -n tl) hd ih).
+
+foldVec : ∀ A: ★. ∀ X: Nat ➔ ★. X zero ➔ (∀ n: Nat. A ➔ X n ➔ X (succ n)) ➔ ∀ n: Nat. Vec ·A n ➔ X n
+= Λ A. Λ X. λ vn. λ vc. indVec ·A ·(λ n: Nat. λ _: Vec ·A n. X n) vn (Λ n. Λ tl. λ hd. λ ih. vc -n hd ih)  .
+
+-- appendVec : ∀ A: ★. ∀ m: Nat. ∀ n: Nat. Vec ·A m ➔ Vec ·A n ➔ Vec ·A (add m n)
+-- = Λ A. Λ m. Λ n. λ xs. λ ys.
+--   foldVec ·A ·(λ i: Nat. Vec ·A (add i n)) ys (Λ i. λ hd. λ zs. vcons -(add i n) hd zs) -m xs .

@@ -34,4 +34,8 @@ indNat ◂ ∀ P: Nat ➔ ★. P zero ➔ (∀ m: Nat. P m ➔ P (succ m)) ➔ �
                base (Λ m. λ pf'. step -(cNat2Nat m) pf')]
       - ρ (refNat n) - pf .
 
+foldNat : ∀ X: ★. X ➔ (X ➔ X) ➔ Nat ➔ X
+= Λ X. λ z. λ s. λ x. x.1 z s .
 
+add : Nat ➔ Nat ➔ Nat
+= λ m. λ n. foldNat n succ m .

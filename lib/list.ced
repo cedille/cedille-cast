@@ -1,0 +1,75 @@
+module lib/list .
+
+import top .
+
+ListC : ★ ➔ ★
+= λ A: ★. ∀ X: ★. X ➔ (A ➔ X ➔ X) ➔ X .
+
+nilC : ∀ A: ★. ListC ·A
+= Λ A. Λ X. λ n. λ c. n .
+
+consC : ∀ A: ★. A ➔ ListC ·A ➔ ListC ·A
+= Λ A. λ hd. λ tl. Λ X. λ n. λ c. c hd (tl n c) .
+
+ListI : Π A: ★. ListC ·A ➔ ★
+= λ A: ★. λ xs: ListC ·A.
+  ∀ X: ListC ·A ➔ ★. X (nilC ·A) ➔ (∀ tl: ListC ·A. Π hd: A. X tl ➔ X (consC hd tl)) ➔
+  X xs .
+
+List : ★ ➔ ★ = λ A: ★. ι xs: ListC ·A. ListI ·A xs .
+
+nil : ∀ A: ★. List ·A
+= Λ A. [ nilC ·A , Λ X. λ n. λ c. n ] .
+
+cons : ∀ A: ★. A ➔ List ·A ➔ List ·A
+= Λ A. λ hd. λ tl.
+  [ consC hd tl.1
+  , Λ X. λ n. λ c. c -tl.1 hd (tl.2 n c) ] .
+
+reflectList : ∀ A: ★. ListC ·A ➔ List ·A
+= Λ A. λ xs. xs (nil ·A) (cons ·A) .
+
+reflectionList : ∀ A: ★. Π xs: List ·A. { xs ≃ reflectList xs.1 }
+= Λ A. λ xs.
+  xs.2 ·(λ x: ListC ·A. { x ≃ reflectList x.1 })
+    β (Λ tl. λ hd. λ ih. ρ+ ς ih - β) .
+
+indList
+: ∀ A: ★. ∀ X: List ·A ➔ ★.
+  X (nil ·A) ➔ (∀ tl: List ·A. Π hd: A. X tl ➔ X (cons hd tl)) ➔
+  Π xs: List ·A. X xs
+= Λ A. Λ X. λ n. λ c. λ xs.
+  ρ (reflectionList xs)
+- xs.2 ·(λ x: ListC ·A. X (reflectList x))
+    n (Λ tl. λ hd. λ ih. c -(reflectList tl) hd ih).
+
+foldList
+: ∀ A: ★. ∀ X: ★. X ➔ (A ➔ X ➔ X) ➔ List ·A ➔ X
+= Λ A. Λ X. λ n. λ c. λ xs. indList ·A ·(λ _: List ·A. X) n (Λ _. c) xs .
+
+import nat .
+
+lengthL : ∀ A: ★. List ·A ➔ Nat
+= Λ A. λ xs. foldList ·A zero (λ _. succ) xs .
+
+appendL : ∀ A: ★. List ·A ➔ List ·A ➔ List ·A
+= Λ A. λ xs. λ ys.
+  foldList ·A ·(List ·A) ys (cons ·A) xs .
+
+appendLenL
+: ∀ A: ★. Π xs: List ·A. Π ys: List ·A.
+  { lengthL (appendL xs ys) ≃ add (lengthL xs) (lengthL ys) }
+= Λ A. λ xs. λ ys.
+  indList ·A
+    ·(λ x: List ·A. { lengthL (appendL x ys) ≃ add (lengthL x) (lengthL ys) })
+    β (Λ tl. λ hd. λ ih. ρ+ ih - β)
+    xs .
+
+appendAssocL
+: ∀ A: ★. Π xs: List ·A. Π ys: List ·A. Π zs: List ·A.
+  { appendL xs (appendL ys zs) ≃ appendL (appendL xs ys) zs }
+= Λ A. λ xs.
+  indList ·A
+    ·(λ x: List ·A. Π ys: List ·A. Π zs: List ·A.
+      { appendL x (appendL ys zs) ≃ appendL (appendL x ys) zs })
+    (λ ys. λ zs. β) (Λ tl. λ hd. λ ih. λ ys. λ zs. ρ+ (ih ys zs) - β) xs .

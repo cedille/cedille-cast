@@ -1,0 +1,3 @@
+module lib/top .
+
+Top : ★ = {λ x. x ≃ λ x. x} .
