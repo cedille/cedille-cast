@@ -1,0 +1,228 @@
+-- -*- eval: (flyspell-mode); eval: (auto-fill-mode); -*-
+
+module cedille-cast-10 .
+
+{- # Zero-cost reuse for dependent types
+-- =============================================================================
+--
+-- Hello, and welcome back to the Cedille Cast. In this video, we explore a
+-- pragmatic issue in using dependently typed languages: efficient reuse of
+-- data, programs, and proofs. When programming with dependent types, broadly
+-- there are two ``styles'' of giving proofs about programs. One style is
+-- ``extrinsic verification''', where first a ``raw'' program is written
+-- (usually in a simpler fragment of the language) and then second a proof is
+-- given concerning a property of that program. An example of this might be
+-- defining merge sort as a function between lists of ordered elements, then
+-- proving that lists in the image of merge sort respect that ordering. The
+-- other style is ``intrinsic'' verification, wherein the properties you are
+-- assuming or guaranteeing are ``baked in'' to your data structure and the
+-- program satisfies the desired property by construction. For merge sort
+-- example, this would correspond to having a bespoke ``sorted list of
+-- elements'', and merge sort would take any list of elements with an ordering
+-- and return this sorted-list datatype.
+--
+-- There are merits to both approaches: extrinsic verification is useful for
+-- one-off properties, or properties hard to express as a datatype invariant;
+-- intrinsic verification is especially nice when combined with language
+-- facilities such as dependent pattern matching which propagates equations
+-- implied by structural invariants throughout your typing context. However,
+-- intrinsic verification can be somewhat bothersome in that it can lead to
+-- multiple different versions of a single datatype of functional programming
+-- languages into your dependently typed one: for example, for lists there are
+-- length-indexed lists, provably sorted lists, and so on.
+--
+-- With each new variation on a plain datatype, programmers must consider
+-- whether they want to redo all or some of the functionality for the plain
+-- datatype or to reuse this functionality by way of functions converting to and
+-- from the variants. For the latter, such conversions typically involve
+-- iteratively tearing down the given structure and rebuilding it into the
+-- desired structure, incurring linear time overhead at each conversion.
+--
+-- We are going to explore an alternative form of reuse using conversions for
+-- lambda encoded datatypes in Cedille that take constant time -- that is,
+-- zero-cost coercion -- which comes from a manuscript by Diehl and Stump that
+-- precedes their accepted ICFP'18 paper (coauthored with Firsov) "Generic
+-- zero-cost reuse for dependent types". Links -- to author versions of both of
+-- these papers are given in the description. In this video, we will be using
+-- manually derived inductive lambda encodings, rather than Cedille's built in
+-- datatype system, and manually derived zero cost reuse, instead of the generic
+-- results of the published paper.
+--
+-- The basic idea is to observe that the information one uses to enrich some
+-- ``plain datatype'' to express some property over it often play no
+-- computational role -- they could be safely erased in many circumstances. In
+-- Cedille, we can use implicit products to quantify over terms in a
+-- proof-irrelevant fashion. If, in Cedille, we use implicit products for
+-- quantifying over the natural number lengths in the definition of length
+-- indexed lists, then it turns out that the lambda encodings for the
+-- constructors of both this and ``plain'' lists are in fact the same (after
+-- erasure).
+--
+-- Let us recall the types of Church-encoded lists and length indexed lists
+-- (typically called "vectors")
+-}
+
+import nat .
+
+import list .
+import vec .
+
+{- As mentioned, notice that the length information in `Vec` quantified over
+-- implicitly in the definition. Because of this, all such information erases
+-- away in terms, and we have that the corresponding constructors of each
+-- datatype are equal
+-}
+
+_ : { nil ≃ vnil } = β .
+_ : { cons ≃ vcons } = β .
+
+{- The method of linear-time reuse from vectors to lists involves folding over
+-- the given vector, replacing each constructor with the appropriate list
+-- constructor.
+-}
+
+v2l : ∀ A: ★. ∀ n: Nat. Vec ·A n ➔ List ·A
+= Λ A. foldVec ·A ·(λ _: Nat. List ·A) (nil ·A) (Λ _. cons ·A) .
+
+-- in the vcons case, we ignore length information and replace with cons
+-- The definition of v2l erases to the following:
+_ : {v2l ≃ λ xs. xs nil cons} = β .
+
+{- An alternative method for constructing lists in "constant time" has us not
+-- rebuilding with list constructors, but with the *interpretations* of the list
+-- constructors that some *future* fold will use. This is precisely the same
+-- technique uses for defining constant-time addition for Church encoded
+-- naturals, and involves going "under the lambdas" for lists.
+--
+-- The lists we are using are manually derived inductive lambda encodings
+-- defined with dependent intersections, so zero-cost coercions will also be
+-- defined in two parts: one for the ordinary Church encoding and one for its
+-- induction principle
+-}
+
+v2lC! : ∀ A: ★. ∀ n: Nat. Vec ·A n ➔ ListC ·A
+= Λ A. Λ n. λ xs. Λ X. λ ln. λ lc.
+  foldVec ·A ·(λ _: Nat. X) ln (Λ _. lc) -n xs .
+
+{- Since `foldVec' merely applies its first two arguments to the given vector,
+-- and types and erased term abstractions are erased, we get that the body of
+-- the function is `xs ln lc`. Then, by the eta-law for lambda expressions, the
+-- whole expression then eta-contracts
+-}
+
+_ : {v2lC! ≃ λ x. x} = β .
+
+{- This remains true when we go on to show that lists built in this way satisfy
+-- the list inductivity predicate
+-}
+
+v2lI! : ∀ A: ★. ∀ n: Nat. Π xs: Vec ·A n. ListI ·A (v2lC! -n xs)
+= Λ A. Λ n. λ xs. Λ X. λ ln. λ lc.
+  indVec ·A ·(λ i: Nat. λ x: Vec ·A i. X (v2lC! -i x))
+    ln
+    (Λ n. Λ tl. lc -(v2lC! -n tl))
+    -n xs.
+
+-- 1. introduce assumptions A, n xs
+-- 2. unfold the definition of `ListI` and introduce assumptions X, ln, lc
+-- 3. invoke the induction principle `indVec` for vectors to show that the
+--    property X holds for Church lists formed from conversion `v2lC!`
+-- 4. for the inductive case, use the given assumption lc on an erased list
+--    formed from converting the assumed tail of the vector
+
+{- Again, and as if by magic, the proof that lists converted from vectors
+-- satisfy the list inductivity principle is *also* convertible with identity
+-}
+
+_ : {v2lI! ≃ λ x. x} = β .
+
+{- We can now put these two functions together to get a zero-cost coercion
+-- between lists and vectors
+-}
+
+v2l! : ∀ A: ★. ∀ n: Nat. Vec ·A n ➔ List ·A
+= Λ A. Λ n. λ xs. [ v2lC! -n xs , v2lI! -n xs ] .
+
+{- Reuse is also possible in the other direction: lists can be converted to
+-- vectors whose length index is the length of the original list
+-}
+
+l2vC! : ∀ A: ★. Π xs: List ·A. VecC ·A (lengthL xs)
+= Λ A. λ xs. Λ X. λ vn. λ vc.
+  indList ·A ·(λ x: List ·A. X (lengthL x))
+    vn
+    (Λ tl. vc -(lengthL tl))
+    xs .
+
+_ : { l2vC! ≃ λ x. x } = β .
+
+l2vI! : ∀ A: ★. Π xs: List ·A. VecI ·A (lengthL xs) (l2vC! xs)
+= Λ A. λ xs. Λ X. λ vn. λ vc.
+  indList ·A ·(λ x: List ·A. X (lengthL x) (l2vC! x))
+    vn
+    (Λ tl. vc -(lengthL tl) -(l2vC! tl))
+    xs.
+
+_ : { l2vI! ≃ λ x. x } = β .
+
+l2v! : ∀ A: ★. Π xs: List ·A. Vec ·A (lengthL xs)
+= Λ A. λ xs. [ l2vC! xs , l2vI! xs ] .
+
+{- Notice that there is something of an asymmetry between the two conversion
+-- functions: converting from vectors to lists is ``lossy'', in the sense that
+-- the statically available length information is discarded. In order to make
+-- full use of reuse, we will want a proof that the length of a list formed from
+-- coercing a vector is the same as the length index of that vector
+-}
+
+v2lLen : ∀ A: ★. ∀ n: Nat. Π xs: Vec ·A n. { lengthL (v2l! xs) ≃ n}
+= Λ A. Λ n. λ xs.
+  indVec ·A ·(λ i: Nat. λ x: Vec ·A i. { lengthL (v2l! x) ≃ i })
+    β (Λ n. Λ tl. λ hd. λ ih. ρ+ ih - β) -n xs .
+
+{- We can now consider a simple example of program reuse from lists to vectors.
+-- If we are in a situation where we have the base datatype `List`, a function
+-- `appendList` for appending two lists, and a proof that the length of a list
+-- formed from appending is equal to the sum of the lengths of the two lists
+-- from which it was formed, and then we find we need an append function for
+-- vectors, we can reuse this functionality with only constant-time overhead
+-}
+
+appendV : ∀ A: ★. ∀ m: Nat. ∀ n: Nat. Vec ·A m ➔ Vec ·A n ➔ Vec ·A (add m n)
+= Λ A. Λ m. Λ n. λ xs. λ ys.
+  [zs : List ·A = appendL (v2l! -m xs) (v2l! -n ys)]
+  -- 1. convert the vectors to lists and append them
+- [eq : { lengthL zs ≃ add m n}
+    = ρ+ (appendLenL (v2l! -m xs) (v2l! -n ys))
+    - ρ+ (v2lLen -m xs) - ρ+ (v2lLen -n ys)
+    - β]
+  -- 2. show that the length of the resulting list is equal to the sum of the
+  --    length indexes of the original vectors, using the proof for lists and
+  --    the proof that lists coerced from vectors preserve the length index
+- ρ+ ς eq - (l2v! zs).
+  -- 3. rewrite by the proof and coerce back
+
+{- To repeat: all the coercions back and forth incur no serious overhead,
+-- which we can prove by showing that `appendVec` is equal to `appendList` by
+-- definition
+-}
+
+_ : { appendV ≃ appendL } = β .
+
+{- We conclude this video with an example of *proof reuse*. For proofs of
+-- equalities, in Cedille this even simpler than program reuse because equality
+-- is untyped. Because `appendVec` is *definitionally equal* to `appendList`,
+-- the proof that `appendList` is associative applies directly to `appendVec`,
+-- modulo some insertion of coercions
+-}
+
+appendAssocV
+: ∀ A: ★. ∀ m: Nat. ∀ n: Nat. ∀ o: Nat.
+  Π xs: Vec ·A m. Π ys: Vec ·A n. Π zs: Vec ·A o.
+  { appendV xs (appendV ys zs) ≃ appendV (appendV xs ys) zs }
+= Λ A. Λ m. Λ n. Λ o. λ xs. λ ys. λ zs.
+  appendAssocL (v2l! -m xs) (v2l! -n ys) (v2l! -o zs) .
+
+{- Thanks for watching. I hope you enjoyed this video, and that you and those
+-- you know are well while during this pandemic. See you in the next video.
+-}
