@@ -12,24 +12,24 @@ module cedille-cast-10 .
 -- ``extrinsic verification''', where first a ``raw'' program is written
 -- (usually in a simpler fragment of the language) and then second a proof is
 -- given concerning a property of that program. An example of this might be
--- defining merge sort as a function between lists of ordered elements, then
--- proving that lists in the image of merge sort respect that ordering. The
--- other style is ``intrinsic'' verification, wherein the properties you are
--- assuming or guaranteeing are ``baked in'' to your data structure and the
--- program satisfies the desired property by construction. For merge sort
--- example, this would correspond to having a bespoke ``sorted list of
--- elements'', and merge sort would take any list of elements with an ordering
--- and return this sorted-list datatype.
+-- defining mergesort as a function over lists whose elements have some
+-- ordering, then proving that the order of the elements as they occur in sorted
+-- lists respects the given ordering. The other style is ``intrinsic''
+-- verification, wherein the properties you are assuming or guaranteeing are
+-- ``baked in'' to your data structure and the program satisfies the desired
+-- property by construction. For the merge sort example, this would correspond
+-- to having a bespoke ``sorted list of elements'', and merge sort would take
+-- any list of elements with an ordering and return this sorted-list datatype.
 --
 -- There are merits to both approaches: extrinsic verification is useful for
--- one-off properties, or properties hard to express as a datatype invariant;
--- intrinsic verification is especially nice when combined with language
--- facilities such as dependent pattern matching which propagates equations
--- implied by structural invariants throughout your typing context. However,
--- intrinsic verification can be somewhat bothersome in that it can lead to
--- multiple different versions of a single datatype of functional programming
--- languages into your dependently typed one: for example, for lists there are
--- length-indexed lists, provably sorted lists, and so on.
+-- one-off proofs of properties, or properties hard to express as a datatype
+-- invariant; intrinsic verification is especially nice when combined with
+-- language facilities such as dependent pattern matching which propagates the
+-- equations implied by structural invariants throughout your typing context.
+-- However, intrinsic verification can be somewhat bothersome in that it can
+-- lead to multiple versions of a single plain datatype of functional
+-- programming when you move to dependent types: for example, for lists there
+-- are length-indexed lists, provably sorted lists, and so on.
 --
 -- With each new variation on a plain datatype, programmers must consider
 -- whether they want to redo all or some of the functionality for the plain
@@ -40,29 +40,31 @@ module cedille-cast-10 .
 --
 -- We are going to explore an alternative form of reuse using conversions for
 -- lambda encoded datatypes in Cedille that take constant time -- that is,
--- zero-cost coercion -- which comes from a manuscript by Diehl and Stump that
--- precedes their accepted ICFP'18 paper (coauthored with Firsov) "Generic
--- zero-cost reuse for dependent types". Links -- to author versions of both of
--- these papers are given in the description. In this video, we will be using
--- manually derived inductive lambda encodings, rather than Cedille's built in
--- datatype system, and manually derived zero cost reuse, instead of the generic
--- results of the published paper.
+-- zero-cost coercions -- which comes from a manuscript by Diehl and Stump that
+-- precedes their accepted ICFP'18 paper coauthored with Firsov and titled
+-- "Generic zero-cost reuse for dependent types". Links to author versions of
+-- both of these papers are given in the description. In this video, we will be
+-- using Church encoded data with induction manually derived, rather than
+-- Cedille's built in datatype system, and manually derived zero cost reuse,
+-- instead of the generic results of the published paper.
 --
 -- The basic idea is to observe that the information one uses to enrich some
 -- ``plain datatype'' to express some property over it often play no
--- computational role -- they could be safely erased in many circumstances. In
--- Cedille, we can use implicit products to quantify over terms in a
+-- computational role -- they could be safely erased in many circumstances. For
+-- example, length information for lists can be dynamically computed, so
+-- length-indexed lists do not need to carry around this information explicitly.
+-- In Cedille, we can use implicit products to quantify over terms in a
 -- proof-irrelevant fashion. If, in Cedille, we use implicit products for
 -- quantifying over the natural number lengths in the definition of length
 -- indexed lists, then it turns out that the lambda encodings for the
 -- constructors of both this and ``plain'' lists are in fact the same (after
 -- erasure).
 --
--- Let us recall the types of Church-encoded lists and length indexed lists
+v2l-- Let us recall the types of Church-encoded lists and length indexed lists
 -- (typically called "vectors")
 -}
 
-import nat .
+import nat .q
 
 import list .
 import vec .

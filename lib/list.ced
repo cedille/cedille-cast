@@ -1,7 +1,5 @@
 module lib/list .
 
-import top .
-
 ListC : ★ ➔ ★
 = λ A: ★. ∀ X: ★. X ➔ (A ➔ X ➔ X) ➔ X .
 
