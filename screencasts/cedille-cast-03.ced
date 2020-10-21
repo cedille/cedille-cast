@@ -132,10 +132,10 @@ intrCast-fail ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cas
 -- that in action:
 
 phi ◂ ∀ A: ★. ∀ B: ★. Π a: A. ∀ b: B. {b ≃ a} ➾ B
-  = Λ A. Λ B. λ a. Λ b. Λ eq. φ eq - b {a}.
+  = Λ A. Λ B. λ a. Λ b. Λ eq. φ eq - b {|a|}.
 
 intrCast ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A ·B
-  = Λ A. Λ B. λ f. λ eq. [ f , φ ς eq - (ρ eq - β) {f} ].
+  = Λ A. Λ B. λ f. λ eq. [ f , φ ς eq - (ρ eq - β) {|f|} ].
 
 -- Here, φ takes an equality stating that λ x. x ≃ f and two additional terms.
 -- The first term must erase to λ x. x and have the type we are trying to show
@@ -153,7 +153,7 @@ intrCast ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. {f ≃ λ x. x} ➔ Cast ·A
 -- use this to create a cast function that *is intentionally* the identity.
 
 intrCastExt ◂ ∀ A: ★. ∀ B: ★. Π f: A ➔ B. (Π a: A. {f a ≃ a}) ➔ Cast ·A ·B
-  = Λ A. Λ B. λ f. λ ext. [ λ x. φ (ext x) - (f x) {x} , β ].
+  = Λ A. Λ B. λ f. λ ext. [ λ x. φ (ext x) - (f x) {|x|} , β ].
 
 -- Here, we use φ in the first component for our A ➔ B function, not the second
 -- for our proof. We use the fact that f x ≃ x given to us by `ext x` as our
@@ -219,7 +219,7 @@ rapp ◂ ∀ A: ★. ∀ B: ★. A ➔ (A ➔ B) ➔ B
 -- elimination principle that is *obviously* zero-cost. And we can get it!
 
 elimCast' ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➔ B
-  = Λ A. Λ B. λ a. λ c. φ (ρ c.2 - β) - (c.1 a) {a}.
+  = Λ A. Λ B. λ a. λ c. φ (ρ c.2 - β) - (c.1 a) {|a|}.
 
 -- Again, we use φ, this time the equality we give is the proof that `c.1 a ≃ a`
 -- which we have by rewriting using the proof that `c.1 ≃ λ x. x`, then we give
@@ -232,7 +232,7 @@ elimCast' ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➔ B
 -- the identity function:
 
 elimCast ◂ ∀ A: ★. ∀ B: ★. A ➔ Cast ·A ·B ➾ B
-  = Λ A. Λ B. λ a. Λ c. φ (ρ c.2 - β) - (c.1 a) {a}.
+  = Λ A. Λ B. λ a. Λ c. φ (ρ c.2 - β) - (c.1 a) {|a|}.
 
 -- To top it all off, lets put our casts to use and define a function over
 -- regular lists that we can reuse as a function over length-indexed lists
@@ -270,7 +270,7 @@ test-length-eq ◂ {length ≃ vlength} = β.
 -- for otherwise untypable terms:
 
 Top ◂ ★ = { λ x. x ≃ λ x. x }.
-omega ◂ Top = β{(λ x. x x) (λ x. x x)}.
+omega ◂ Top = β{|(λ x. x x) (λ x. x x)|}.
 
 -- The intuitive justification for this comes from Kleene's numeric
 -- realizability, which holds that any term at all can prove a "trivially" true
