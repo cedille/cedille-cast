@@ -60,11 +60,11 @@ module cedille-cast-10 .
 -- constructors of both this and ``plain'' lists are in fact the same (after
 -- erasure).
 --
-v2l-- Let us recall the types of Church-encoded lists and length indexed lists
+-- Let us recall the types of Church-encoded lists and length indexed lists
 -- (typically called "vectors")
 -}
 
-import nat .q
+import nat .
 
 import list .
 import vec .
